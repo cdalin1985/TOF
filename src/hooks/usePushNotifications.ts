@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string;
+const VAPID_PUBLIC_KEY: string | undefined = import.meta.env.VITE_VAPID_PUBLIC_KEY;
 
 function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -32,7 +32,7 @@ export function usePushNotifications() {
   }, [supported, player]);
 
   const subscribe = async () => {
-    if (!player || !supported) return;
+    if (!player || !supported || !VAPID_PUBLIC_KEY) return;
     setLoading(true);
     try {
       const perm = await Notification.requestPermission();

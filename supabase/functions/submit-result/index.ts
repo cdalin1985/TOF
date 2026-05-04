@@ -184,6 +184,11 @@ async function confirmResult(
 
   // Update per-discipline stats
   const disc = match.discipline;
+  // Ensure rows exist for both players before reading/writing
+  await Promise.all([winnerId, loserId].map((pid) =>
+    supabase.from('player_discipline_stats')
+      .upsert({ player_id: pid, discipline: disc }, { onConflict: 'player_id,discipline', ignoreDuplicates: true })
+  ));
   for (const [pid, isWinner, isChallenger] of [
     [winnerId, true, winnerIsChallenger],
     [loserId, false, !winnerIsChallenger],
@@ -275,6 +280,17 @@ serve(async (req) => {
     if (!updated) return new Response(JSON.stringify({ error: 'Update failed.' }), { headers: cors });
 
     if (updated.player1_submitted && updated.player2_submitted) {
+      // Atomic claim: only the request that transitions submitted→confirming proceeds.
+      // Concurrent duplicate submissions see 0 rows updated and short-circuit.
+      const { data: claimed } = await supabase
+        .from('matches')
+        .update({ status: 'confirming' } as Record<string, unknown>)
+        .eq('id', match_id)
+        .eq('status', 'submitted')
+        .select('id');
+      if (!claimed?.length) {
+        return new Response(JSON.stringify({ success: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
       const loser_id = winner_id === match.player1_id ? match.player2_id : match.player1_id;
       await confirmResult(supabase, match_id, winner_id, loser_id, final_score_player1, final_score_player2, match);
     } else {

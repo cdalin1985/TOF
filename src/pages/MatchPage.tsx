@@ -83,12 +83,17 @@ export default function MatchPage() {
 
   const callFn = async (path: string, body: object) => {
     const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Session expired — please log in again.');
     const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify(body),
     });
-    return res.json();
+    try {
+      return await res.json();
+    } catch {
+      throw new Error(`Unexpected server response (${res.status})`);
+    }
   };
 
   const handleScoreUpdate = async (winnerId: string) => {
@@ -96,14 +101,20 @@ export default function MatchPage() {
     const newMyScore    = winnerId === myId    ? myScore + 1 : myScore;
     const newTheirScore = winnerId === theirId ? theirScore + 1 : theirScore;
     setSubmitting(true);
+    setSubmitError('');
     const p1Score = isPlayer1 ? newMyScore : newTheirScore;
     const p2Score = isPlayer1 ? newTheirScore : newMyScore;
-    await callFn('update-match-score', {
-      match_id: match.id,
-      my_score: isPlayer1 ? p1Score : p2Score,
-      opponent_score: isPlayer1 ? p2Score : p1Score,
-    });
-    setSubmitting(false);
+    try {
+      await callFn('update-match-score', {
+        match_id: match.id,
+        my_score: isPlayer1 ? p1Score : p2Score,
+        opponent_score: isPlayer1 ? p2Score : p1Score,
+      });
+    } catch (e) {
+      setSubmitError(e instanceof Error ? e.message : 'Score update failed.');
+    } finally {
+      setSubmitting(false);
+    }
     qc.invalidateQueries({ queryKey: ['match', id] });
   };
 
@@ -217,13 +228,24 @@ export default function MatchPage() {
 
       {amInMatch && (
         <div className="space-y-3">
+          {submitError && (
+            <div className="text-[#EF4444] text-xs font-[Barlow] p-3 bg-[#EF4444]/10 rounded-lg border border-[#EF4444]/20">
+              {submitError}
+            </div>
+          )}
           {match.status === 'scheduled' && (
             <Button
               variant="primary" fullWidth size="lg" loading={submitting}
               onClick={async () => {
                 setSubmitting(true);
-                await callFn('update-match-score', { match_id: match.id, my_score: 0, opponent_score: 0 });
-                setSubmitting(false);
+                setSubmitError('');
+                try {
+                  await callFn('update-match-score', { match_id: match.id, my_score: 0, opponent_score: 0 });
+                } catch (e) {
+                  setSubmitError(e instanceof Error ? e.message : 'Failed to start match.');
+                } finally {
+                  setSubmitting(false);
+                }
                 qc.invalidateQueries({ queryKey: ['match', id] });
               }}
             >

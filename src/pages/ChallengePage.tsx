@@ -54,15 +54,21 @@ export default function ChallengePage() {
     setSending(true);
     setError('');
     const { data: { session } } = await supabase.auth.getSession();
-    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-challenge`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ challenged_player_id: id, discipline, race_length: race }),
-    });
-    const json = await res.json() as { challenge_id?: string; error?: string };
-    setSending(false);
-    if (json.error) { setError(json.error); return; }
-    setSent(true);
+    if (!session) { setError('Session expired — please log in again.'); setSending(false); return; }
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-challenge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ challenged_player_id: id, discipline, race_length: race }),
+      });
+      const json = await res.json() as { challenge_id?: string; error?: string };
+      if (json.error) { setError(json.error); return; }
+      setSent(true);
+    } catch {
+      setError('Network error — please try again.');
+    } finally {
+      setSending(false);
+    }
   };
 
   if (sent) {

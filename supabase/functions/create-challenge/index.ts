@@ -122,19 +122,25 @@ serve(async (req) => {
         .update({ challenges_received: challengedStats.challenges_received + 1 })
         .eq('player_id', challenged_player_id);
     }
-    // Discipline stats
-    await supabase.from('player_discipline_stats')
-      .upsert({ player_id: challenger.id, discipline }, { onConflict: 'player_id,discipline', ignoreDuplicates: false });
-    const { data: dStatsC } = await supabase.from('player_discipline_stats').select('challenges_issued').eq('player_id', challenger.id).eq('discipline', discipline).single();
-    if (dStatsC) {
+    // Discipline stats — seed rows for both players before incrementing
+    await Promise.all([
+      supabase.from('player_discipline_stats')
+        .upsert({ player_id: challenger.id, discipline }, { onConflict: 'player_id,discipline', ignoreDuplicates: true }),
+      supabase.from('player_discipline_stats')
+        .upsert({ player_id: challenged_player_id, discipline }, { onConflict: 'player_id,discipline', ignoreDuplicates: true }),
+    ]);
+    const [dStatsC, dStatsD] = await Promise.all([
+      supabase.from('player_discipline_stats').select('challenges_issued').eq('player_id', challenger.id).eq('discipline', discipline).single(),
+      supabase.from('player_discipline_stats').select('challenges_received').eq('player_id', challenged_player_id).eq('discipline', discipline).single(),
+    ]);
+    if (dStatsC.data) {
       await supabase.from('player_discipline_stats')
-        .update({ challenges_issued: dStatsC.challenges_issued + 1 })
+        .update({ challenges_issued: dStatsC.data.challenges_issued + 1 })
         .eq('player_id', challenger.id).eq('discipline', discipline);
     }
-    const { data: dStatsD } = await supabase.from('player_discipline_stats').select('challenges_received').eq('player_id', challenged_player_id).eq('discipline', discipline).single();
-    if (dStatsD) {
+    if (dStatsD.data) {
       await supabase.from('player_discipline_stats')
-        .update({ challenges_received: dStatsD.challenges_received + 1 })
+        .update({ challenges_received: dStatsD.data.challenges_received + 1 })
         .eq('player_id', challenged_player_id).eq('discipline', discipline);
     }
 

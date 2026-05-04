@@ -1,15 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
-const url = import.meta.env.VITE_SUPABASE_URL as string;
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
 if (!url || !key) {
-  console.warn('[TOC] Missing Supabase env vars — check .env.local');
+  throw new Error('[TOC] Missing Supabase env vars — set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local');
 }
 
-// We don't pass Database generic here to avoid complex type inference issues;
-// instead we use explicit type assertions where needed.
-export const supabase = createClient(url ?? '', key ?? '', {
+export const supabase = createClient(url, key, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,

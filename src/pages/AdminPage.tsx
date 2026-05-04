@@ -23,7 +23,8 @@ export default function AdminPage() {
   const qc          = useQueryClient();
   const [tab, setTab] = useState<TabKey>('disputes');
 
-  if (profile && !['admin', 'super_admin'].includes(profile.role)) {
+  if (!profile) return null;
+  if (!['admin', 'super_admin'].includes(profile.role)) {
     navigate('/', { replace: true });
     return null;
   }
@@ -107,12 +108,16 @@ function DisputesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const [loading, setLoading]     = useState(false);
 
   const handleResolve = async (matchId: string) => {
+    const s1 = parseInt(p1Score, 10);
+    const s2 = parseInt(p2Score, 10);
+    if (!winnerId || isNaN(s1) || isNaN(s2) || s1 < 0 || s2 < 0) return;
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setLoading(false); return; }
     await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-dispute`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ match_id: matchId, winner_id: winnerId, final_score_player1: parseInt(p1Score), final_score_player2: parseInt(p2Score), notes }),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ match_id: matchId, winner_id: winnerId, final_score_player1: s1, final_score_player2: s2, notes }),
     });
     setLoading(false);
     setResolving(null);
@@ -232,9 +237,10 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     if (!winnerId || !c.match_id) return;
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setLoading(false); resetAction(); return; }
     await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-dispute`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({ match_id: c.match_id, winner_id: winnerId, final_score_player1: 0, final_score_player2: 0, notes: 'Admin forfeit' }),
     });
     await supabase.from('challenges').update({ status: 'forfeited' }).eq('id', c.id);
@@ -351,11 +357,13 @@ function MatchesAdminTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const [loading, setLoading]     = useState(false);
 
   const handleForceComplete = async (matchId: string) => {
+    if (!winnerId) return;
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setLoading(false); return; }
     await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-dispute`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({ match_id: matchId, winner_id: winnerId, final_score_player1: parseInt(p1Score) || 0, final_score_player2: parseInt(p2Score) || 0, notes }),
     });
     setLoading(false);
@@ -578,9 +586,10 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     setAddLoading(true);
     setAddError('');
     const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setAddError('Session expired — please log in again.'); setAddLoading(false); return; }
     const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/add-player`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({ full_name: newName.trim() }),
     });
     const json = await res.json();
@@ -657,9 +666,10 @@ function TreasuryTab() {
     if (!amount || !desc) return;
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setLoading(false); return; }
     await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-treasury`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({ entry_type: entryType, amount_cents: Math.round(parseFloat(amount) * 100), description: desc }),
     });
     setLoading(false);
@@ -728,13 +738,19 @@ function Rank1Tab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const callFn = async (enforce: boolean) => {
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
-    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rank1-compliance`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ enforce }),
-    });
-    setStatus(await res.json());
-    setLoading(false);
+    if (!session) { setLoading(false); return; }
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rank1-compliance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ enforce }),
+      });
+      setStatus(await res.json());
+    } catch {
+      setStatus({ error: 'Network error — please try again.' });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
