@@ -27,18 +27,32 @@ export const Layout: React.FC = () => {
 
   // Bootstrap auth state
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) {
-        fetchProfileAndPlayer(session.user.id).finally(() => {
+    let cancelled = false;
+
+    const init = async () => {
+      try {
+        const { data: { session } } = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('auth timeout')), 8000)
+          ),
+        ]);
+        if (cancelled) return;
+        setSession(session);
+        if (session) {
+          await fetchProfileAndPlayer(session.user.id).catch(() => {});
+        }
+      } catch {
+        // Network error or timeout — unblock the app and let route guards redirect
+      } finally {
+        if (!cancelled) {
           setIsLoading(false);
           setAppReady(true);
-        });
-      } else {
-        setIsLoading(false);
-        setAppReady(true);
+        }
       }
-    });
+    };
+
+    init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
@@ -49,7 +63,10 @@ export const Layout: React.FC = () => {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
