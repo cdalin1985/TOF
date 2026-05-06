@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, KeyRound, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Mail, KeyRound, AlertCircle, ArrowLeft, HelpCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { EKGLine } from '../components/EKGLine';
@@ -8,14 +8,19 @@ import { Button } from '../components/Button';
 
 type Step = 'email' | 'code';
 
+// Auto-focus the email field only on desktop. On phones it pops the keyboard
+// the moment the page loads, covering the title and disorienting first-time visitors.
+const SHOULD_AUTO_FOCUS_EMAIL =
+  typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches;
+
 export default function LoginPage() {
-  const navigate            = useNavigate();
-  const [step, setStep]     = useState<Step>('email');
-  const [email, setEmail]   = useState('');
-  const [code, setCode]     = useState('');
+  const navigate              = useNavigate();
+  const [step, setStep]       = useState<Step>('email');
+  const [email, setEmail]     = useState('');
+  const [code, setCode]       = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError]   = useState('');
-  const [resent, setResent]  = useState(false);
+  const [error, setError]     = useState('');
+  const [resent, setResent]   = useState(false);
   const codeRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -78,13 +83,13 @@ export default function LoginPage() {
       />
 
       <motion.div
-        initial={{ opacity: 0, y: 30 }}
+        initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
+        transition={{ duration: 0.3, ease: 'easeOut' }}
         className="relative z-10 w-full max-w-sm"
       >
         {/* Logo */}
-        <div className="text-center mb-10">
+        <div className="text-center mb-8">
           <motion.div
             animate={{ y: [0, -8, 0] }}
             transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
@@ -105,6 +110,11 @@ export default function LoginPage() {
             Helena Pool League
           </p>
           <EKGLine className="mx-auto mt-3" />
+          {/* Tagline gives first-time visitors a one-line answer to "what is this?" */}
+          <p className="text-[#A1A1AA] font-[Barlow] text-base mt-5 leading-relaxed">
+            Track your matches. Climb the ladder.{' '}
+            <span className="text-[#E8E2D6] font-semibold">Defend your spot.</span>
+          </p>
         </div>
 
         <AnimatePresence mode="wait">
@@ -119,17 +129,24 @@ export default function LoginPage() {
               className="glass-card p-6 space-y-4"
             >
               <div>
-                <label className="block text-[#9CA3AF] text-sm font-[Barlow] mb-2">
+                <label
+                  htmlFor="login-email"
+                  className="block text-[#9CA3AF] text-sm font-[Barlow] mb-2"
+                >
                   Email Address
                 </label>
                 <div className="relative">
                   <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280]" />
                   <input
+                    id="login-email"
+                    name="email"
                     type="email"
+                    autoComplete="email"
+                    inputMode="email"
                     value={email}
                     onChange={(e) => { setEmail(e.target.value); setError(''); }}
                     placeholder="your@email.com"
-                    autoFocus
+                    autoFocus={SHOULD_AUTO_FOCUS_EMAIL}
                     className="w-full pl-10 pr-4 py-3 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-base placeholder-[#6B7280] focus:outline-none focus:border-[#C62828] focus:ring-1 focus:ring-[#C62828]/30 transition-colors"
                   />
                 </div>
@@ -137,9 +154,9 @@ export default function LoginPage() {
                   <motion.p
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="flex items-center gap-1.5 text-[#EF4444] text-xs mt-2 font-[Barlow]"
+                    className="flex items-center gap-1.5 text-[#EF4444] text-sm mt-2 font-[Barlow]"
                   >
-                    <AlertCircle size={12} /> {error}
+                    <AlertCircle size={14} /> {error}
                   </motion.p>
                 )}
               </div>
@@ -155,8 +172,10 @@ export default function LoginPage() {
                 <Mail size={16} /> Send Sign-In Code
               </Button>
 
-              <p className="text-center text-[#6B7280] text-xs font-[Barlow] leading-relaxed">
-                We'll email you a 6-digit code. No password needed.
+              {/* Helper bumped from text-xs (12px) to text-sm (14px) for legibility.
+                  Fixed: was "6-digit", actual code is 8 digits. */}
+              <p className="text-center text-[#A1A1AA] text-sm font-[Barlow] leading-relaxed">
+                We'll email you an 8-digit code. No password needed.
               </p>
             </motion.form>
           ) : (
@@ -173,6 +192,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => { setStep('email'); setCode(''); setError(''); }}
+                  aria-label="Back to email step"
                   className="text-[#9CA3AF] hover:text-[#E8E2D6] transition-colors"
                 >
                   <ArrowLeft size={18} />
@@ -181,17 +201,22 @@ export default function LoginPage() {
                   <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">
                     Check your email
                   </div>
-                  <div className="text-[#6B7280] text-xs font-[Barlow]">
+                  <div className="text-[#A1A1AA] text-sm font-[Barlow]">
                     Code sent to {email}
                   </div>
                 </div>
               </div>
 
               <div>
-                <label className="flex items-center gap-1.5 text-[#9CA3AF] text-sm font-[Barlow] mb-3">
+                <label
+                  htmlFor="login-code"
+                  className="flex items-center gap-1.5 text-[#9CA3AF] text-sm font-[Barlow] mb-3"
+                >
                   <KeyRound size={14} /> 8-Digit Code
                 </label>
                 <input
+                  id="login-code"
+                  name="otp"
                   ref={codeRef}
                   type="text"
                   inputMode="numeric"
@@ -207,9 +232,9 @@ export default function LoginPage() {
                   <motion.p
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="flex items-center gap-1.5 text-[#EF4444] text-xs mt-2 font-[Barlow]"
+                    className="flex items-center gap-1.5 text-[#EF4444] text-sm mt-2 font-[Barlow]"
                   >
-                    <AlertCircle size={12} /> {error}
+                    <AlertCircle size={14} /> {error}
                   </motion.p>
                 )}
               </div>
@@ -227,12 +252,12 @@ export default function LoginPage() {
 
               <div className="text-center">
                 {resent ? (
-                  <p className="text-[#22C55E] text-xs font-[Barlow]">Code resent!</p>
+                  <p className="text-[#22C55E] text-sm font-[Barlow]">Code resent!</p>
                 ) : (
                   <button
                     type="button"
                     onClick={handleResend}
-                    className="text-[#9CA3AF] text-xs font-[Barlow] underline underline-offset-2 hover:text-[#E8E2D6] transition-colors"
+                    className="text-[#9CA3AF] text-sm font-[Barlow] underline underline-offset-2 hover:text-[#E8E2D6] transition-colors"
                   >
                     Resend code
                   </button>
@@ -241,6 +266,17 @@ export default function LoginPage() {
             </motion.form>
           )}
         </AnimatePresence>
+
+        {/* Quiet help link below the card. First-time visitors and locked-out members
+            need an escape hatch — there was no contact path before. */}
+        <div className="mt-5 text-center">
+          <a
+            href="mailto:help@toc.monster?subject=TOC%20sign-in%20help"
+            className="inline-flex items-center gap-1.5 text-[#71717A] hover:text-[#A1A1AA] text-sm font-[Barlow] transition-colors"
+          >
+            <HelpCircle size={14} /> Trouble signing in?
+          </a>
+        </div>
       </motion.div>
     </div>
   );
