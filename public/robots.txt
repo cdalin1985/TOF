@@ -1,0 +1,6 @@
+# Top of the Capital — Helena Pool League
+# This is a private, auth-walled league app — nothing useful for crawlers to index.
+
+User-agent: *
+Disallow: /
+
