@@ -3,16 +3,44 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/toc-icon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
+    <!-- Removed maximum-scale=1.0 and user-scalable=no — they were blocking pinch-zoom (a11y / WCAG 1.4.4).
+         Added viewport-fit=cover so the dark background extends behind the iPhone notch. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- Page description (was missing) -->
+    <meta name="description" content="Helena Pool League's competitive ladder. Track your matches, climb the rankings, and defend your spot at the top." />
+
     <meta name="theme-color" content="#C62828" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="TOC" />
-    <title>Top of the Capital</title>
+
+    <!-- Open Graph: rich previews when toc.monster is shared in iMessage / Slack / Discord / etc. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Top of the Capital" />
+    <meta property="og:title" content="Top of the Capital — Helena Pool League" />
+    <meta property="og:description" content="Track your matches. Climb the ladder. Defend your spot." />
+    <meta property="og:url" content="https://toc.monster/" />
+    <meta property="og:image" content="https://toc.monster/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Top of the Capital — Helena Pool League" />
+
+    <!-- Twitter card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Top of the Capital — Helena Pool League" />
+    <meta name="twitter:description" content="Track your matches. Climb the ladder. Defend your spot." />
+    <meta name="twitter:image" content="https://toc.monster/og-image.png" />
+
+    <title>Top of the Capital — Helena Pool League</title>
     <link rel="manifest" href="/manifest.json" />
+
+    <!-- Fonts: trimmed from 4 families to 3 (Teko dropped — overlapped Bebas Neue's job).
+         Barlow trimmed from 5 weights to 2 (400 + 600). Saves ~6 font-file requests on first paint. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Teko:wght@400;500;600;700&family=Barlow:wght@300;400;500;600;700&family=Azeret+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;600&family=Azeret+Mono:wght@400;500&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div id="root"></div>
