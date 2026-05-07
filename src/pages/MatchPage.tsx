@@ -255,7 +255,7 @@ export default function MatchPage() {
 
           {/* Opponent submitted — needs confirmation from this player */}
           {match.status === 'submitted' && !hasSubmitted && (
-            <GlassCard className="p-4 mb-1" style={{ borderColor: 'rgba(245,158,11,0.4)', border: '1px solid rgba(245,158,11,0.4)' }}>
+            <GlassCard className="p-4 mb-1 border border-[#F59E0B]/40">
               <div className="flex items-start gap-3">
                 <div className="text-2xl shrink-0">📋</div>
                 <div>
