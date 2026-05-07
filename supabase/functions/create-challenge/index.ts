@@ -52,6 +52,13 @@ serve(async (req) => {
     const myPos   = challengerRankRes.data.position;
     const theirPos = challengedRankRes.data.position;
 
+    // Auto-expire stale pending challenges system-wide before our checks below.
+    // This is the lazy-cleanup pattern: every create-challenge call sweeps any
+    // 'pending' rows whose expires_at has passed (the 7-day window) and flips
+    // them to 'expired'. Idempotent and cheap (indexable on status+expires_at).
+    // Without this, stale pending rows wedge both challenger and challenged.
+    await supabase.rpc('expire_stale_challenges');
+
     // Check if this is the challenger's first ever challenge (any status counts)
     const { count: priorChallenges } = await supabase
       .from('challenges')
@@ -79,13 +86,15 @@ serve(async (req) => {
       }
     }
 
-    // Check no pending outgoing challenge
+    // Check no pending outgoing challenge.
+    // Using maybeSingle() because zero-row is a valid normal case and
+    // .single() throws on zero rows (would manifest as a 500 to the client).
     const { data: existingOut } = await supabase
       .from('challenges')
       .select('id')
       .eq('challenger_id', challenger.id)
       .eq('status', 'pending')
-      .single();
+      .maybeSingle();
     if (existingOut) return new Response(JSON.stringify({ error: 'You already have a pending outgoing challenge.' }), { headers: corsHeaders });
 
     // Check challenged player doesn't already have a pending challenge (must play first challenger first)
@@ -94,7 +103,7 @@ serve(async (req) => {
       .select('id')
       .eq('challenged_id', challenged_player_id)
       .eq('status', 'pending')
-      .single();
+      .maybeSingle();
     if (existingIn) return new Response(JSON.stringify({ error: 'That player already has a pending challenge they must respond to first.' }), { headers: corsHeaders });
 
     // Create challenge — 7 day response window
@@ -165,7 +174,7 @@ serve(async (req) => {
     });
 
     return new Response(JSON.stringify({ challenge_id: challenge.id }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders: 'Content-Type': 'application/json' },
     });
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: corsHeaders });
