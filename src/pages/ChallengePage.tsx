@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase';
 import { PoolBall } from '../components/PoolBall';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
+import { InactivePlayerBanner } from '../components/InactivePlayerBanner';
 
 type Discipline = '8 Ball' | '9 Ball' | '10 Ball';
 
@@ -114,6 +115,11 @@ export default function ChallengePage() {
           </h1>
         </div>
       </div>
+
+      {/* Inactive player warning */}
+      {target && !target.player.is_active && (
+        <InactivePlayerBanner playerName={target.player.full_name} />
+      )}
 
       {/* Opponent preview */}
       <GlassCard className="p-4 flex items-center gap-3 mb-6">
@@ -237,6 +243,8 @@ export default function ChallengePage() {
               fullWidth
               size="lg"
               loading={sending}
+              disabled={!target?.player.is_active}
+              style={{ opacity: target?.player.is_active ? 1 : 0.4, cursor: target?.player.is_active ? 'pointer' : 'not-allowed' }}
               onClick={handleSend}
             >
               <Swords size={18} /> Send Challenge ⚔️
