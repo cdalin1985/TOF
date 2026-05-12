@@ -8,6 +8,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useRankings } from '../hooks/useRankings';
 import { Avatar } from '../components/Avatar';
 import { GlassCard } from '../components/GlassCard';
+import { InactivePlayerBanner } from '../components/InactivePlayerBanner';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { CardSkeleton } from '../components/Skeleton';
@@ -108,6 +109,9 @@ export default function PlayerPage() {
         <GlassCard className="p-6 text-center relative overflow-hidden mb-4">
           <div className="absolute inset-0 bg-gradient-to-br from-[#C62828]/5 to-transparent pointer-events-none" />
           <Avatar player={player} size={80} className="mx-auto mb-4" />
+          {player && !player.is_active && (
+            <InactivePlayerBanner playerName={player.full_name} />
+          )}
           <h1 className="font-[Bebas_Neue] text-4xl text-[#E8E2D6]">{player.full_name}</h1>
           <div className="flex items-center justify-center flex-wrap gap-2 mt-2">
             <span className="font-[Azeret_Mono] text-2xl font-bold text-[#C62828]">
