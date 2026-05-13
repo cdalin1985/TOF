@@ -21,7 +21,7 @@ export const Layout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const { session, profile, player, isLoading, setSession, setProfile, setPlayer, setIsLoading, reset } = useAuthStore();
+  const { session, player, isLoading, setSession, setProfile, setPlayer, setIsLoading, reset } = useAuthStore();
   const { isOffline, setIsOffline } = useUIStore();
   const [appReady, setAppReady] = useState(false);
 

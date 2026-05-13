@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, AlertTriangle, Users, DollarSign, Settings, FileText,
@@ -460,30 +460,27 @@ function RankingsTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const [order, setOrder]   = useState<RankRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved]   = useState(false);
-
-  useEffect(() => {
-    if (rawRankings.length > 0) setOrder(rawRankings);
-  }, [rawRankings]);
+  const displayedOrder = order.length > 0 ? order : rawRankings;
 
   const moveUp = (idx: number) => {
     if (idx === 0) return;
     setOrder((prev) => {
-      const next = [...prev];
+      const next = [...(prev.length > 0 ? prev : rawRankings)];
       [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
       return next;
     });
   };
 
   const moveDown = (idx: number) => {
-    if (idx === order.length - 1) return;
+    if (idx === displayedOrder.length - 1) return;
     setOrder((prev) => {
-      const next = [...prev];
+      const next = [...(prev.length > 0 ? prev : rawRankings)];
       [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
       return next;
     });
   };
 
-  const isDirty = order.some((r, i) => {
+  const isDirty = displayedOrder.some((r, i) => {
     const original = rawRankings.find((raw) => raw.player_id === r.player_id);
     return original?.position !== i + 1;
   });
@@ -491,7 +488,7 @@ function RankingsTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const handleSave = async () => {
     setSaving(true);
     await Promise.all(
-      order.map((r, i) =>
+      displayedOrder.map((r, i) =>
         supabase.from('rankings')
           .update({ position: i + 1, previous_position: r.position })
           .eq('player_id', r.player_id)
@@ -504,7 +501,7 @@ function RankingsTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     qc.invalidateQueries({ queryKey: ['admin-rankings'] });
   };
 
-  if (order.length === 0) {
+  if (displayedOrder.length === 0) {
     return <div className="text-center py-12 text-[#6B7280] font-[Barlow]">Loading rankings…</div>;
   }
 
@@ -517,7 +514,7 @@ function RankingsTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
       </GlassCard>
 
       <div className="space-y-1">
-        {order.map((r, i) => {
+        {displayedOrder.map((r, i) => {
           const original = rawRankings.find((raw) => raw.player_id === r.player_id);
           const changed = original?.position !== i + 1;
           return (
@@ -538,7 +535,7 @@ function RankingsTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
                   className="p-1 rounded text-[#9CA3AF] hover:text-[#E8E2D6] disabled:opacity-20 transition-colors">
                   <ArrowUp size={14} />
                 </button>
-                <button onClick={() => moveDown(i)} disabled={i === order.length - 1}
+                <button onClick={() => moveDown(i)} disabled={i === displayedOrder.length - 1}
                   className="p-1 rounded text-[#9CA3AF] hover:text-[#E8E2D6] disabled:opacity-20 transition-colors">
                   <ArrowDown size={14} />
                 </button>
@@ -726,9 +723,16 @@ function TreasuryTab() {
 // ─── Rank #1 Compliance ──────────────────────────────────────────────────────
 
 type Rank1Status = {
-  penalized?: boolean; player?: string; top5_matches?: number;
-  days_elapsed?: number; days_remaining?: number; compliant?: boolean;
-  message?: string; error?: string;
+  penalized?: boolean;
+  player?: string;
+  top5_matches?: number;
+  required_top5_matches?: number;
+  days_elapsed?: number;
+  days_remaining?: number;
+  target_rank?: number;
+  compliant?: boolean;
+  message?: string;
+  error?: string;
 };
 
 function Rank1Tab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
@@ -772,14 +776,12 @@ function Rank1Tab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
         <GlassCard className="p-5">
           {status.error ? (
             <p className="text-[#EF4444] text-sm font-[Barlow]">{status.error}</p>
-          ) : status.message ? (
-            <p className="text-[#9CA3AF] text-sm font-[Barlow]">{status.message}</p>
           ) : status.penalized ? (
             <>
               <div className="text-3xl mb-2">📉</div>
               <div className="font-[Bebas_Neue] text-xl text-[#EF4444] mb-1">Penalty Applied</div>
               <p className="text-[#9CA3AF] text-sm font-[Barlow]">
-                {status.player} was moved to #10 — only {status.top5_matches}/2 top-5 matches in {status.days_elapsed} days.
+                {status.player} was moved to #{status.target_rank ?? 10} — only {status.top5_matches}/{status.required_top5_matches ?? 2} top-5 matches in {status.days_elapsed} days.
               </p>
             </>
           ) : (
@@ -788,22 +790,27 @@ function Rank1Tab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
                 <span className="font-[Barlow] font-semibold text-[#E8E2D6]">{status.player}</span>
                 <Badge variant={status.compliant ? 'win' : 'pending'}>{status.compliant ? 'Compliant' : 'At Risk'}</Badge>
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="text-center">
-                  <div className="font-[Azeret_Mono] font-bold text-2xl text-[#E8E2D6]">{status.top5_matches}/2</div>
-                  <div className="text-[#6B7280] text-xs font-[Barlow]">Top-5 matches</div>
-                </div>
-                <div className="text-center">
-                  <div className="font-[Azeret_Mono] font-bold text-2xl text-[#E8E2D6]">{status.days_elapsed}</div>
-                  <div className="text-[#6B7280] text-xs font-[Barlow]">Days elapsed</div>
-                </div>
-                <div className="text-center">
-                  <div className="font-[Azeret_Mono] font-bold text-2xl" style={{ color: (status.days_remaining ?? 30) <= 7 ? '#EF4444' : '#E8E2D6' }}>
-                    {status.days_remaining}
+              {status.message && (
+                <p className="text-[#9CA3AF] text-sm font-[Barlow] mb-4">{status.message}</p>
+              )}
+              {status.days_elapsed !== undefined && (
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="text-center">
+                    <div className="font-[Azeret_Mono] font-bold text-2xl text-[#E8E2D6]">{status.top5_matches}/{status.required_top5_matches ?? 2}</div>
+                    <div className="text-[#6B7280] text-xs font-[Barlow]">Top-5 matches</div>
                   </div>
-                  <div className="text-[#6B7280] text-xs font-[Barlow]">Days left</div>
+                  <div className="text-center">
+                    <div className="font-[Azeret_Mono] font-bold text-2xl text-[#E8E2D6]">{status.days_elapsed}</div>
+                    <div className="text-[#6B7280] text-xs font-[Barlow]">Days elapsed</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-[Azeret_Mono] font-bold text-2xl" style={{ color: (status.days_remaining ?? 30) <= 2 ? '#EF4444' : '#E8E2D6' }}>
+                      {status.days_remaining}
+                    </div>
+                    <div className="text-[#6B7280] text-xs font-[Barlow]">Days left</div>
+                  </div>
                 </div>
-              </div>
+              )}
             </>
           )}
         </GlassCard>
@@ -814,7 +821,60 @@ function Rank1Tab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 
 // ─── League Settings ─────────────────────────────────────────────────────────
 
+
+type SettingsFormState = {
+  min_race: number | '';
+  max_race: number | '';
+  challenge_range: number | '';
+  cooldown_hours: number | '';
+  challenge_expiry_days: number | '';
+  challenge_response_hours: number | '';
+  match_play_days: number | '';
+  challenge_weekly_limit: number | '';
+  first_challenge_range: number | '';
+};
+
+const RULE_FIELDS: Array<{ key: keyof SettingsFormState; label: string; unit: string }> = [
+  { key: 'min_race', label: 'Min race length', unit: 'games' },
+  { key: 'challenge_range', label: 'Challenge range', unit: 'spots (normal)' },
+  { key: 'first_challenge_range', label: 'First challenge range', unit: 'spots (first ever)' },
+  { key: 'challenge_weekly_limit', label: 'Weekly challenge limit', unit: 'challenges per 7 days' },
+  { key: 'challenge_response_hours', label: 'Challenge response window', unit: 'hours to accept/decline' },
+  { key: 'match_play_days', label: 'Match play window', unit: 'days after acceptance' },
+  { key: 'cooldown_hours', label: 'Post-match cooldown', unit: 'hours after a win' },
+  { key: 'challenge_expiry_days', label: 'Challenge expiry', unit: 'days until auto-expire' },
+];
+
+type SettingsFieldProps = {
+  label: string;
+  unit: string;
+  value: number | '';
+  onChange: (value: number | '') => void;
+};
+
+function SettingsField({ label, unit, value, onChange }: SettingsFieldProps) {
+  return (
+    <div className="flex items-center justify-between py-3 border-b border-white/5 last:border-0">
+      <div>
+        <div className="font-[Barlow] text-sm text-[#E8E2D6]">{label}</div>
+        <div className="text-[#6B7280] text-xs font-[Barlow]">{unit}</div>
+      </div>
+      <input
+        type="number"
+        min={1}
+        value={value}
+        onChange={(event) => {
+          const raw = event.target.value;
+          onChange(raw === '' ? '' : Number(raw));
+        }}
+        className="w-20 px-3 py-1.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Azeret_Mono] text-sm text-center focus:outline-none focus:border-[#C62828]"
+      />
+    </div>
+  );
+}
+
 function SettingsTab() {
+  const qc = useQueryClient();
   const { data: settings } = useQuery<LeagueSettings>({
     queryKey: ['league-settings'],
     queryFn: async () => {
@@ -823,51 +883,65 @@ function SettingsTab() {
     },
   });
 
-  const [edits, setEdits]   = useState<Partial<Record<keyof LeagueSettings, number>>>({});
+  const [edits, setEdits] = useState<Partial<SettingsFormState>>({});
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved]   = useState(false);
+  const [saved, setSaved] = useState(false);
 
-  const get = (key: keyof LeagueSettings) =>
-    key in edits ? (edits[key as keyof typeof edits] as number) : (settings?.[key] as number ?? 0);
-  const set = (key: keyof LeagueSettings, val: number) => setEdits((e) => ({ ...e, [key]: val }));
+  if (!settings) return <div className="text-center py-12 text-[#6B7280] font-[Barlow]">Loading settings…</div>;
+
+  const form: SettingsFormState = {
+    min_race: edits.min_race ?? settings.min_race,
+    max_race: edits.max_race ?? settings.max_race,
+    challenge_range: edits.challenge_range ?? settings.challenge_range,
+    cooldown_hours: edits.cooldown_hours ?? settings.cooldown_hours,
+    challenge_expiry_days: edits.challenge_expiry_days ?? settings.challenge_expiry_days,
+    challenge_response_hours: edits.challenge_response_hours ?? settings.challenge_response_hours,
+    match_play_days: edits.match_play_days ?? settings.match_play_days,
+    challenge_weekly_limit: edits.challenge_weekly_limit ?? settings.challenge_weekly_limit,
+    first_challenge_range: edits.first_challenge_range ?? settings.first_challenge_range,
+  };
+
+  const set = (key: keyof SettingsFormState, val: number | '') => {
+    setEdits((current) => ({ ...current, [key]: val }));
+    setSaved(false);
+  };
+
+  const hasBlankField = Object.values(form).some((value) => value === '');
+  const isDirty = Object.entries(form).some(([key, value]) => (
+    value !== settings[key as keyof SettingsFormState]
+  ));
 
   const handleSave = async () => {
-    if (!settings || Object.keys(edits).length === 0) return;
+    if (!isDirty || hasBlankField) return;
+    if (!window.confirm('Save these league rule changes?')) return;
     setSaving(true);
-    await supabase.from('league_settings').update(edits).eq('id', settings.id);
+    await supabase.from('league_settings').update(form).eq('id', settings.id);
     setSaving(false);
     setEdits({});
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+    qc.invalidateQueries({ queryKey: ['league-settings'] });
+    qc.invalidateQueries({ queryKey: ['admin-league-settings'] });
   };
-
-  if (!settings) return <div className="text-center py-12 text-[#6B7280] font-[Barlow]">Loading settings…</div>;
-
-  const Field = ({ label, fieldKey, unit }: { label: string; fieldKey: keyof LeagueSettings; unit: string }) => (
-    <div className="flex items-center justify-between py-3 border-b border-white/5 last:border-0">
-      <div>
-        <div className="font-[Barlow] text-sm text-[#E8E2D6]">{label}</div>
-        <div className="text-[#6B7280] text-xs font-[Barlow]">{unit}</div>
-      </div>
-      <input type="number" value={get(fieldKey)} onChange={(e) => set(fieldKey, parseInt(e.target.value) || 0)}
-        className="w-20 px-3 py-1.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Azeret_Mono] text-sm text-center focus:outline-none focus:border-[#C62828]" />
-    </div>
-  );
 
   return (
     <div className="space-y-4">
       <GlassCard className="p-4">
         <h3 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-1">League Rules</h3>
-        <Field label="Min race length"           fieldKey="min_race"                  unit="games" />
-        <Field label="Challenge range"           fieldKey="challenge_range"           unit="spots (normal)" />
-        <Field label="First challenge range"     fieldKey="first_challenge_range"     unit="spots (first ever)" />
-        <Field label="Weekly challenge limit"    fieldKey="challenge_weekly_limit"    unit="challenges per 7 days" />
-        <Field label="Challenge response window" fieldKey="challenge_response_hours"  unit="hours to accept/decline" />
-        <Field label="Match play window"         fieldKey="match_play_days"           unit="days after acceptance" />
-        <Field label="Post-match cooldown"       fieldKey="cooldown_hours"            unit="hours after a win" />
-        <Field label="Challenge expiry"          fieldKey="challenge_expiry_days"     unit="days until auto-expire" />
+        {RULE_FIELDS.map((field) => (
+          <SettingsField
+            key={field.key}
+            label={field.label}
+            value={form[field.key]}
+            onChange={(value) => set(field.key, value)}
+            unit={field.unit}
+          />
+        ))}
       </GlassCard>
-      <Button variant="primary" fullWidth loading={saving} disabled={Object.keys(edits).length === 0} onClick={handleSave}>
+      {hasBlankField && (
+        <p className="text-[#EF4444] text-xs font-[Barlow] px-1">Fill in every setting before saving.</p>
+      )}
+      <Button variant="primary" fullWidth loading={saving} disabled={!isDirty || hasBlankField} onClick={handleSave}>
         {saved ? '✓ Saved' : 'Save Settings'}
       </Button>
     </div>

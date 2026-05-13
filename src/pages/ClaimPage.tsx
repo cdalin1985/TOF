@@ -6,7 +6,6 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { PoolBall } from '../components/PoolBall';
 import { Button } from '../components/Button';
-import { Skeleton } from '../components/Skeleton';
 import { GlassCard } from '../components/GlassCard';
 import type { Player, Ranking, PlayerMetrics } from '../types/database';
 

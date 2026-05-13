@@ -11,14 +11,15 @@ import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { EmptyState } from '../components/EmptyState';
 import { RankingRowSkeleton } from '../components/Skeleton';
-import { formatDistanceToNow, formatDateTime } from '../utils/time';
+import { formatDateTime } from '../utils/time';
 import type { Challenge } from '../types/database';
 
 const VENUES = ['Eagles 4040', 'Valley Hub'] as const;
 type Venue = typeof VENUES[number];
+type ChallengeWithHoursLeft = Challenge & { hours_left: number };
 
 function usePlayerChallenges(playerId: string | undefined) {
-  return useQuery<Challenge[]>({
+  return useQuery<ChallengeWithHoursLeft[]>({
     queryKey: ['challenges', playerId],
     queryFn: async () => {
       if (!playerId) return [];
@@ -27,7 +28,11 @@ function usePlayerChallenges(playerId: string | undefined) {
         .select('*')
         .or(`challenger_id.eq.${playerId},challenged_id.eq.${playerId}`)
         .order('created_at', { ascending: false });
-      return data ?? [];
+      const now = Date.now();
+      return (data ?? []).map((challenge) => ({
+        ...challenge,
+        hours_left: Math.max(0, Math.ceil((new Date(challenge.expires_at).getTime() - now) / 3600000)),
+      }));
     },
     enabled: !!playerId,
   });
@@ -255,8 +260,7 @@ export default function ChallengesPage() {
             const isChallenger = c.challenger_id === player?.id;
             const opponentId   = isChallenger ? c.challenged_id : c.challenger_id;
             const opponentName = getPlayerName(opponentId);
-            const expires      = new Date(c.expires_at);
-            const hoursLeft    = Math.max(0, Math.ceil((expires.getTime() - Date.now()) / 3600000));
+            const hoursLeft    = c.hours_left;
 
             return (
               <motion.div
