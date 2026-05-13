@@ -174,7 +174,7 @@ serve(async (req) => {
     });
 
     return new Response(JSON.stringify({ challenge_id: challenge.id }), {
-      headers: { ...corsHeaders: 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: corsHeaders });

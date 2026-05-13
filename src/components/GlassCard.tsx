@@ -30,6 +30,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
     className;
 
   const resolvedStyle = { ...(glow ? { borderColor: 'rgba(198,40,40,0.35)' } : {}), ...style };
+  const Component = Tag;
 
   if (onClick) {
     return (
@@ -45,8 +46,8 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   }
 
   return (
-    <div className={base} style={resolvedStyle}>
+    <Component className={base} style={resolvedStyle}>
       {children}
-    </div>
+    </Component>
   );
 };

@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const cors = {
@@ -6,42 +6,71 @@ const cors = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const OBLIGATION_DAYS = 30;
+const REQUIRED_TOP5_MATCHES = 2;
+
+function json(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...cors, 'Content-Type': 'application/json' },
+  });
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
   try {
     const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
 
-    // Must be called by an admin
+    // Must be called by an admin.
     const { data: { user } } = await supabase.auth.getUser(req.headers.get('Authorization')?.replace('Bearer ', ''));
-    if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: cors });
+    if (!user) return json({ error: 'Unauthorized' }, 401);
 
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
     if (!profile || !['admin', 'super_admin'].includes(profile.role)) {
-      return new Response(JSON.stringify({ error: 'Admin access required.' }), { status: 403, headers: cors });
+      return json({ error: 'Admin access required.' }, 403);
     }
 
-    // Get current #1 player
+    const { enforce } = await req.json().catch(() => ({ enforce: false }));
+
     const { data: rank1 } = await supabase
       .from('rankings')
-      .select('player_id, rank1_since')
+      .select('player_id, rank1_since, players(full_name)')
       .eq('position', 1)
       .single();
 
-    if (!rank1) return new Response(JSON.stringify({ error: 'No #1 player found.' }), { headers: cors });
+    if (!rank1) return json({ error: 'No #1 player found.' });
+
+    const playerName = rank1.players?.full_name ?? 'Rank #1 player';
+
     if (!rank1.rank1_since) {
-      // Set rank1_since to now if missing
-      await supabase.from('rankings').update({ rank1_since: new Date().toISOString() }).eq('player_id', rank1.player_id);
-      return new Response(JSON.stringify({ message: 'rank1_since initialized.', top5_matches: 0, days_elapsed: 0 }), {
-        headers: { ...cors, 'Content-Type': 'application/json' },
+      if (enforce) {
+        const { error } = await supabase
+          .from('rankings')
+          .update({ rank1_since: new Date().toISOString() })
+          .eq('player_id', rank1.player_id);
+        if (error) return json({ error: error.message }, 500);
+      }
+
+      return json({
+        penalized: false,
+        player: playerName,
+        top5_matches: 0,
+        required_top5_matches: REQUIRED_TOP5_MATCHES,
+        days_elapsed: 0,
+        days_remaining: OBLIGATION_DAYS,
+        compliant: true,
+        message: enforce
+          ? 'rank1_since was missing, so it was initialized instead of penalizing the #1 player.'
+          : 'rank1_since is missing. Use Enforce Now to initialize it safely, or wait for the scheduled automation.',
       });
     }
 
     const rank1Since = new Date(rank1.rank1_since);
     const now = new Date();
-    const daysSince = (now.getTime() - rank1Since.getTime()) / (1000 * 3600 * 24);
+    const daysElapsed = Math.floor((now.getTime() - rank1Since.getTime()) / (1000 * 3600 * 24));
+    const daysRemaining = Math.max(0, OBLIGATION_DAYS - daysElapsed);
 
-    // Count top-5 matches in window
     const { data: top5 } = await supabase
       .from('rankings')
       .select('player_id')
@@ -51,7 +80,7 @@ serve(async (req) => {
 
     let matchCount = 0;
     if (top5Ids.length > 0) {
-      const { count } = await supabase
+      const { count, error } = await supabase
         .from('matches')
         .select('id', { count: 'exact', head: true })
         .eq('status', 'confirmed')
@@ -60,74 +89,48 @@ serve(async (req) => {
           `and(player1_id.eq.${rank1.player_id},player2_id.in.(${top5Ids.join(',')})),` +
           `and(player2_id.eq.${rank1.player_id},player1_id.in.(${top5Ids.join(',')}))`
         );
+      if (error) return json({ error: error.message }, 500);
       matchCount = count ?? 0;
     }
 
-    const { data: rank1Player } = await supabase.from('players').select('id, full_name').eq('id', rank1.player_id).single();
+    const compliant = matchCount >= REQUIRED_TOP5_MATCHES;
+    const overdue = daysElapsed >= OBLIGATION_DAYS;
 
-    // Apply penalty if requested or if window expired
-    const { enforce } = await req.json().catch(() => ({ enforce: false }));
+    if (enforce && !compliant) {
+      const { data: targetRank, error } = await supabase.rpc('apply_rank1_penalty', { p_player_id: rank1.player_id });
+      if (error) return json({ error: error.message }, 500);
 
-    if (enforce || daysSince >= 30) {
-      if (matchCount < 2) {
-        // Penalty: move #1 to #10, cascade #2–#9 up
-        const { data: affectedRanks } = await supabase
-          .from('rankings')
-          .select('id, player_id, position')
-          .gte('position', 2)
-          .lte('position', 10)
-          .order('position');
-
-        if (affectedRanks) {
-          for (const r of affectedRanks) {
-            await supabase.from('rankings').update({
-              previous_position: r.position,
-              position: r.position - 1,
-            }).eq('id', r.id);
-          }
-        }
-
-        await supabase.from('rankings').update({
-          previous_position: 1,
-          position: 10,
-          rank1_since: null,
-        }).eq('player_id', rank1.player_id);
-
-        if (rank1Player) {
-          await supabase.from('notifications').insert({
-            player_id: rank1Player.id,
-            type: 'rank1_penalty',
-            title: '📉 Rank 1 obligation not met',
-            body: 'You did not play a top-5 opponent twice in your 30-day window. You have been moved to #10.',
-            reference_type: 'ranking',
-          });
-
-          await supabase.from('activity_feed').insert({
-            event_type: 'rank1_penalty',
-            headline: `${rank1Player.full_name} was moved to #10 for failing the #1 top-5 obligation.`,
-            actor_player_id: rank1.player_id,
-          });
-        }
-
-        return new Response(JSON.stringify({
-          penalized: true,
-          player: rank1Player?.full_name,
-          top5_matches: matchCount,
-          days_elapsed: Math.floor(daysSince),
-        }), { headers: { ...cors, 'Content-Type': 'application/json' } });
-      }
+      return json({
+        penalized: Boolean(targetRank),
+        player: playerName,
+        top5_matches: matchCount,
+        required_top5_matches: REQUIRED_TOP5_MATCHES,
+        days_elapsed: daysElapsed,
+        days_remaining: daysRemaining,
+        target_rank: targetRank,
+        compliant: false,
+        message: targetRank
+          ? `${playerName} was moved from #1 to #${targetRank} for missing the #1 top-5 obligation.`
+          : 'No penalty was applied. The player may no longer be ranked #1 or there may not be enough ranked players.',
+      });
     }
 
-    return new Response(JSON.stringify({
+    return json({
       penalized: false,
-      player: rank1Player?.full_name,
+      player: playerName,
       top5_matches: matchCount,
-      days_elapsed: Math.floor(daysSince),
-      days_remaining: Math.max(0, Math.floor(30 - daysSince)),
-      compliant: matchCount >= 2,
-    }), { headers: { ...cors, 'Content-Type': 'application/json' } });
-
+      required_top5_matches: REQUIRED_TOP5_MATCHES,
+      days_elapsed: daysElapsed,
+      days_remaining: daysRemaining,
+      target_rank: 10,
+      compliant,
+      message: compliant
+        ? 'The #1 player has met the top-5 match obligation.'
+        : overdue
+          ? 'The #1 player is overdue and below the top-5 match requirement. Cron or Enforce Now can apply the penalty.'
+          : 'The #1 player is still inside the 30-day obligation window.',
+    });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: cors });
+    return json({ error: String(e) }, 500);
   }
 });

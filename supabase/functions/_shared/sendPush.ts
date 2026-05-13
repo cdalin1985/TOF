@@ -1,8 +1,17 @@
-// deno-lint-ignore-file no-explicit-any
 import webpush from 'npm:web-push';
 
+type SupabaseLike = {
+  from: (table: string) => {
+    select: (columns: string) => {
+      eq: (column: string, value: string) => {
+        single: () => Promise<{ data: { subscription?: webpush.PushSubscription } | null }>;
+      };
+    };
+  };
+};
+
 export async function sendPush(
-  supabase: any,
+  supabase: SupabaseLike,
   playerId: string,
   title: string,
   body: string,

@@ -15,7 +15,7 @@ Every player holds a numbered rank. To move up, you challenge players above you 
 - **First challenge ever** — you can challenge anyone up to 10 spots above you
 - **After your first** — you can challenge anyone up to 5 spots above you
 - **Top 10 players** — can challenge up or down 5 spots
-- **#1 ranked player** — can challenge anyone, but must play at least one top-5 opponent at least twice every 30 days or drops to #10
+- **#1 ranked player** — can challenge anyone, but must play at least 2 top-5 opponents within 30 days or be moved to #10
 
 ### Challenge Rules
 

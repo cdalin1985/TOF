@@ -7,7 +7,6 @@ import { useAuthStore } from '../stores/authStore';
 import { useUIStore } from '../stores/uiStore';
 import { useRankings } from '../hooks/useRankings';
 import { usePushNotifications } from '../hooks/usePushNotifications';
-import { PoolBall } from '../components/PoolBall';
 import { Avatar } from '../components/Avatar';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
@@ -34,17 +33,18 @@ export default function SettingsPage() {
   const [showIconPicker, setShowIconPicker] = useState(false);
 
   const myRanking = rankings.find((r) => r.player.id === player?.id);
+  const playerId = player?.id;
 
   useEffect(() => {
-    if (!player) return;
-    supabase.from('players').select('bio, preferred_discipline').eq('id', player.id).single()
+    if (!playerId) return;
+    supabase.from('players').select('bio, preferred_discipline').eq('id', playerId).single()
       .then(({ data }) => {
         if (data) {
           setBio(data.bio ?? '');
           setPreferredDisc((data.preferred_discipline as typeof DISCIPLINES[number] | null) ?? '');
         }
       });
-  }, [player?.id]);
+  }, [playerId]);
 
   const handleSaveName = async () => {
     if (!profile || !displayName.trim()) return;

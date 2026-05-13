@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useMemo } from 'react';
 
 interface ParticleData {
   left: string;
@@ -28,14 +28,15 @@ const Particle: React.FC<{ data: ParticleData }> = ({ data }) => (
 );
 
 export const AmbientBackground: React.FC = () => {
-  const particles = useRef<ParticleData[]>(
-    Array.from({ length: 22 }, (_, i) => ({
+  const particles = useMemo<ParticleData[]>(
+    () => Array.from({ length: 22 }, (_, i) => ({
       left: `${(i * 4.5 + 3) % 95}%`,
       bottom: `${(i * 6.5 + 5) % 50}%`,
       delay: `${(i * 0.38) % 7}s`,
       duration: `${4.5 + (i % 5) * 1.2}s`,
       isCrimson: i % 7 === 0,
-    }))
+    })),
+    []
   );
 
   return (
@@ -106,7 +107,7 @@ export const AmbientBackground: React.FC = () => {
       />
 
       {/* Floating dust particles */}
-      {particles.current.map((p, i) => (
+      {particles.map((p, i) => (
         <Particle key={i} data={p} />
       ))}
     </div>

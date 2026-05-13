@@ -4,101 +4,8 @@ import { sendPush } from '../_shared/sendPush.ts';
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' };
 
-async function checkRank1Compliance(supabase: ReturnType<typeof createClient>) {
-  // Get current #1 player
-  const { data: rank1 } = await supabase
-    .from('rankings')
-    .select('player_id, rank1_since')
-    .eq('position', 1)
-    .single();
-  if (!rank1 || !rank1.rank1_since) return;
-
-  const rank1Since = new Date(rank1.rank1_since);
-  const now = new Date();
-  const daysSince = (now.getTime() - rank1Since.getTime()) / (1000 * 3600 * 24);
-
-  // Count confirmed matches vs top-5 players within the 30-day window
-  const { data: top5 } = await supabase
-    .from('rankings')
-    .select('player_id')
-    .gte('position', 2)
-    .lte('position', 5);
-  const top5Ids = (top5 ?? []).map((r: { player_id: string }) => r.player_id);
-
-  const { count: top5Matches } = await supabase
-    .from('matches')
-    .select('id', { count: 'exact', head: true })
-    .eq('status', 'confirmed')
-    .gte('completed_at', rank1.rank1_since)
-    .or(
-      `and(player1_id.eq.${rank1.player_id},player2_id.in.(${top5Ids.join(',')})),` +
-      `and(player2_id.eq.${rank1.player_id},player1_id.in.(${top5Ids.join(',')}))`
-    );
-
-  const matchCount = top5Matches ?? 0;
-
-  // Send warnings at 20, 25, 28 days if under requirement
-  if (matchCount < 2) {
-    const { data: rank1Player } = await supabase.from('players').select('id, full_name').eq('id', rank1.player_id).single();
-
-    if (daysSince >= 30) {
-      // Atomic cascade via RPC: #1 drops to #10, positions 2–9 each move up one spot.
-      await supabase.rpc('apply_rank1_penalty', { p_player_id: rank1.player_id });
-
-      // Notify the penalized player
-      if (rank1Player) {
-        await supabase.from('notifications').insert({
-          player_id: rank1Player.id,
-          type: 'rank1_penalty',
-          title: '📉 Rank 1 obligation not met',
-          body: 'You did not play a top-5 opponent twice in your 30-day window. You have been moved to #10.',
-          reference_type: 'ranking',
-        });
-      }
-
-      await supabase.from('activity_feed').insert({
-        event_type: 'rank1_penalty',
-        headline: `${rank1Player?.full_name} was moved to #10 for failing the #1 top-5 obligation.`,
-        actor_player_id: rank1.player_id,
-      });
-
-    } else if (daysSince >= 28 && matchCount < 2) {
-      if (rank1Player) {
-        await supabase.from('notifications').insert({
-          player_id: rank1Player.id,
-          type: 'rank1_warning',
-          title: '⚠️ #1 Obligation — 2 days left',
-          body: `You have ${matchCount}/2 top-5 matches played. You have ~2 days to play another top-5 opponent or you'll be moved to #10.`,
-          reference_type: 'ranking',
-        });
-      }
-    } else if (daysSince >= 25 && matchCount < 2) {
-      if (rank1Player) {
-        await supabase.from('notifications').insert({
-          player_id: rank1Player.id,
-          type: 'rank1_warning',
-          title: '⚠️ #1 Obligation — 5 days left',
-          body: `You have ${matchCount}/2 top-5 matches played. You have ~5 days remaining in your 30-day window.`,
-          reference_type: 'ranking',
-        });
-      }
-    } else if (daysSince >= 20 && matchCount < 2) {
-      if (rank1Player) {
-        await supabase.from('notifications').insert({
-          player_id: rank1Player.id,
-          type: 'rank1_warning',
-          title: '⚠️ #1 Obligation — 10 days left',
-          body: `You have ${matchCount}/2 top-5 matches played. You have ~10 days remaining in your 30-day window.`,
-          reference_type: 'ranking',
-        });
-      }
-    }
-  } else if (matchCount >= 2) {
-    // Obligation met — reset the 30-day window
-    await supabase.from('rankings').update({ rank1_since: new Date().toISOString() })
-      .eq('player_id', rank1.player_id);
-  }
-}
+// Rank #1 obligation penalties are handled by the scheduled database job
+// created in supabase/migrations/009_rank1_obligation_cron.sql.
 
 // deno-lint-ignore-file no-explicit-any
 async function confirmResult(
@@ -232,8 +139,6 @@ async function confirmResult(
     actor_player_id: winnerId,
   });
 
-  // Check #1 compliance after every confirmed match
-  await checkRank1Compliance(supabase);
 }
 
 serve(async (req) => {

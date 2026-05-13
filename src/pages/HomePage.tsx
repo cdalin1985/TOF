@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Swords, Trophy, TrendingUp, AlertTriangle, DollarSign, X } from 'lucide-react';
@@ -125,10 +125,10 @@ export default function HomePage() {
         matchCount = count ?? 0;
       }
       return {
-        daysElapsed:   Math.floor(daysSince),
+        daysElapsed: Math.floor(daysSince),
         daysRemaining: Math.max(0, Math.floor(30 - daysSince)),
         matchCount,
-        compliant:     matchCount >= 2,
+        compliant: matchCount >= 2,
       };
     },
     enabled: !!player && isRank1,
@@ -310,7 +310,7 @@ export default function HomePage() {
                 <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-0.5">
                   {rank1Compliance.compliant
                     ? `Window resets in ${rank1Compliance.daysRemaining} days`
-                    : `${rank1Compliance.daysRemaining} days left to play a top-5 opponent or you drop to #10`}
+                    : `${rank1Compliance.daysRemaining} days left to play top-5 opponents or you drop to #10`}
                 </div>
               </div>
             </div>
