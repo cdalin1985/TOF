@@ -1,3 +1,4 @@
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import webpush from 'npm:web-push';
@@ -145,12 +146,12 @@ serve(async (req) => {
     await supabase.from('notifications').insert({
       player_id: challenged_player_id,
       type: 'challenge_received',
-      title: `⚔️ ${challengerPlayer?.full_name} challenged you!`,
-      body: `${discipline} · Race to ${race_length}. You have ${challengeExpiryDays} days to respond.`,
+      title: `âš”ï¸ ${challengerPlayer?.full_name} challenged you!`,
+      body: `${discipline} Â· Race to ${race_length}. You have ${challengeExpiryDays} days to respond.`,
       reference_id: challenge.id,
       reference_type: 'challenge',
     });
-    await sendPush(supabase, challenged_player_id, `⚔️ ${challengerPlayer?.full_name} challenged you!`, `${discipline} · Race to ${race_length}. Tap to respond.`, '/challenges');
+    await sendPush(supabase, challenged_player_id, `âš”ï¸ ${challengerPlayer?.full_name} challenged you!`, `${discipline} Â· Race to ${race_length}. Tap to respond.`, '/challenges');
 
     const { data: challengedPlayer } = await supabase.from('players').select('full_name').eq('id', challenged_player_id).single();
     await supabase.from('activity_feed').insert({ event_type: 'challenge_issued', headline: `${challengerPlayer?.full_name} challenged ${challengedPlayer?.full_name} to ${discipline}!`, actor_player_id: challenger.id });
@@ -160,3 +161,4 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: corsHeaders });
   }
 });
+

@@ -1,3 +1,4 @@
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import webpush from 'npm:web-push';
@@ -49,7 +50,7 @@ async function checkRank1Compliance(supabase: ReturnType<typeof createClient>) {
     const { data: rank1Player } = await supabase.from('players').select('id, full_name').eq('id', rank1.player_id).single();
     await supabase.rpc('apply_rank1_penalty', { p_player_id: rank1.player_id });
     if (rank1Player) {
-      await supabase.from('notifications').insert({ player_id: rank1Player.id, type: 'rank1_penalty', title: '📉 Rank 1 obligation not met', body: 'You did not play a top-5 opponent twice in your 30-day window. You have been moved to #10.', reference_type: 'ranking' });
+      await supabase.from('notifications').insert({ player_id: rank1Player.id, type: 'rank1_penalty', title: 'ðŸ“‰ Rank 1 obligation not met', body: 'You did not play a top-5 opponent twice in your 30-day window. You have been moved to #10.', reference_type: 'ranking' });
     }
     await supabase.from('activity_feed').insert({ event_type: 'rank1_penalty', headline: `${rank1Player?.full_name} was moved to #10 for failing the #1 top-5 obligation.`, actor_player_id: rank1.player_id });
   } else if (matchCount >= 2) {
@@ -121,14 +122,14 @@ async function confirmResult(
   ]);
 
   await supabase.from('notifications').insert([
-    { player_id: winnerId, type: 'result_confirmed', title: '🏆 Match confirmed — Victory!', body: `Final: ${p1Score}–${p2Score}`, reference_id: matchId, reference_type: 'match' },
-    { player_id: loserId, type: 'result_confirmed', title: '📊 Match confirmed', body: `Final: ${p1Score}–${p2Score}`, reference_id: matchId, reference_type: 'match' },
+    { player_id: winnerId, type: 'result_confirmed', title: 'ðŸ† Match confirmed â€” Victory!', body: `Final: ${p1Score}â€“${p2Score}`, reference_id: matchId, reference_type: 'match' },
+    { player_id: loserId, type: 'result_confirmed', title: 'ðŸ“Š Match confirmed', body: `Final: ${p1Score}â€“${p2Score}`, reference_id: matchId, reference_type: 'match' },
   ]);
   await Promise.all([
-    sendPush(supabase, winnerId, '🏆 Match confirmed — Victory!', `Final: ${p1Score}–${p2Score}`, `/match/${matchId}`),
-    sendPush(supabase, loserId, '📊 Match confirmed', `Final: ${p1Score}–${p2Score}`, `/match/${matchId}`),
+    sendPush(supabase, winnerId, 'ðŸ† Match confirmed â€” Victory!', `Final: ${p1Score}â€“${p2Score}`, `/match/${matchId}`),
+    sendPush(supabase, loserId, 'ðŸ“Š Match confirmed', `Final: ${p1Score}â€“${p2Score}`, `/match/${matchId}`),
   ]);
-  await supabase.from('activity_feed').insert({ event_type: 'match_confirmed', headline: `${wp.data?.full_name} def. ${lp.data?.full_name} · ${p1Score}–${p2Score}`, actor_player_id: winnerId });
+  await supabase.from('activity_feed').insert({ event_type: 'match_confirmed', headline: `${wp.data?.full_name} def. ${lp.data?.full_name} Â· ${p1Score}â€“${p2Score}`, actor_player_id: winnerId });
   await checkRank1Compliance(supabase);
 }
 
@@ -179,8 +180,8 @@ serve(async (req) => {
     } else {
       const otherId = isP1 ? match.player2_id : match.player1_id;
       const { data: callerPlayer } = await supabase.from('players').select('full_name').eq('id', caller.id).single();
-      await supabase.from('notifications').insert({ player_id: otherId, type: 'result_submitted', title: '📊 Opponent submitted result', body: `${callerPlayer?.full_name} submitted the match result. Please submit yours to confirm.`, reference_id: match_id, reference_type: 'match' });
-      await sendPush(supabase, otherId, '📊 Opponent submitted result', `${callerPlayer?.full_name} submitted. Tap to confirm.`, `/match/${match_id}`);
+      await supabase.from('notifications').insert({ player_id: otherId, type: 'result_submitted', title: 'ðŸ“Š Opponent submitted result', body: `${callerPlayer?.full_name} submitted the match result. Please submit yours to confirm.`, reference_id: match_id, reference_type: 'match' });
+      await sendPush(supabase, otherId, 'ðŸ“Š Opponent submitted result', `${callerPlayer?.full_name} submitted. Tap to confirm.`, `/match/${match_id}`);
     }
 
     return new Response(JSON.stringify({ success: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });
@@ -188,3 +189,4 @@ serve(async (req) => {
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: cors });
   }
 });
+
