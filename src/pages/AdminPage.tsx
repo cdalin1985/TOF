@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, AlertTriangle, Users, DollarSign, Settings, FileText,
@@ -568,8 +568,36 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     },
   });
 
+  // Metrics lookup for Fargo ratings
+  const playerIds = useMemo(() => players.map((p) => p.id), [players]);
+  const { data: metrics = [] } = useQuery<{ player_id: string; fargo_rating: number | null }[]>({
+    queryKey: ['admin-player-metrics', playerIds],
+    enabled: playerIds.length > 0,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('player_reference_metrics')
+        .select('player_id, fargo_rating')
+        .in('player_id', playerIds);
+      return data ?? [];
+    },
+  });
+  const fargoByPlayer = useMemo(() => {
+    const map = new Map<string, number | null>();
+    for (const m of metrics) map.set(m.player_id, m.fargo_rating);
+    return map;
+  }, [metrics]);
+
+  // Filters: All / Claimed / Unclaimed
+  const [filter, setFilter] = useState<'all' | 'claimed' | 'unclaimed'>('all');
+  const filteredPlayers = useMemo(() => {
+    if (filter === 'claimed') return players.filter((p) => p.profile_id);
+    if (filter === 'unclaimed') return players.filter((p) => !p.profile_id);
+    return players;
+  }, [players, filter]);
+
   const [adding, setAdding]         = useState(false);
   const [newName, setNewName]       = useState('');
+  const [newFargo, setNewFargo]     = useState('');
   const [addLoading, setAddLoading] = useState(false);
   const [addError, setAddError]     = useState('');
 
@@ -584,19 +612,40 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     setAddError('');
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setAddError('Session expired — please log in again.'); setAddLoading(false); return; }
+
+    const payload: { full_name: string; fargo_rating?: number } = { full_name: newName.trim() };
+    const trimmedFargo = newFargo.trim();
+    if (trimmedFargo !== '') {
+      if (!/^\d+$/.test(trimmedFargo)) {
+        setAddError('Fargo rating must be a non-negative whole number.');
+        setAddLoading(false);
+        return;
+      }
+      const numeric = Number(trimmedFargo);
+      if (!Number.isSafeInteger(numeric) || numeric < 0) {
+        setAddError('Fargo rating must be a non-negative whole number.');
+        setAddLoading(false);
+        return;
+      }
+      payload.fargo_rating = numeric;
+    }
+
     const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/add-player`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({ full_name: newName.trim() }),
+      body: JSON.stringify(payload),
     });
     const json = await res.json();
     setAddLoading(false);
     if (json.error) { setAddError(json.error); return; }
     setNewName('');
+    setNewFargo('');
     setAdding(false);
     qc.invalidateQueries({ queryKey: ['admin-players'] });
+    qc.invalidateQueries({ queryKey: ['admin-player-metrics'] });
     qc.invalidateQueries({ queryKey: ['rankings'] });
   };
+
 
   return (
     <div className="space-y-3">
@@ -605,10 +654,13 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
           <h3 className="font-[Bebas_Neue] text-lg text-[#E8E2D6] mb-3">Add New Player</h3>
           <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Full name" autoFocus
             onKeyDown={(e) => e.key === 'Enter' && handleAddPlayer()}
+            className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] mb-2" />
+          <input type="number" min={0} step={1} inputMode="numeric" value={newFargo} onChange={(e) => setNewFargo(e.target.value)} placeholder="Fargo rating (optional)"
+            onKeyDown={(e) => e.key === 'Enter' && handleAddPlayer()}
             className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] mb-3" />
           {addError && <p className="text-[#EF4444] text-xs font-[Barlow] mb-2">{addError}</p>}
           <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={() => { setAdding(false); setNewName(''); setAddError(''); }}>Cancel</Button>
+            <Button variant="ghost" size="sm" onClick={() => { setAdding(false); setNewName(''); setNewFargo(''); setAddError(''); }}>Cancel</Button>
             <Button variant="primary" size="sm" loading={addLoading} disabled={!newName.trim()} onClick={handleAddPlayer}>Add Player</Button>
           </div>
         </GlassCard>
@@ -618,21 +670,37 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
         </Button>
       )}
 
-      <p className="text-[#9CA3AF] text-xs font-[Barlow]">{players.length} total players</p>
-      {players.map((p) => (
-        <GlassCard key={p.id} className="p-3 flex items-center gap-3">
-          <div className="flex-1 min-w-0">
-            <div className={`font-[Barlow] font-semibold text-sm truncate ${p.is_active ? 'text-[#E8E2D6]' : 'text-[#6B7280] line-through'}`}>
-              {p.full_name}
-            </div>
-            <div className="text-[#6B7280] text-xs font-[Barlow]">{p.profile_id ? 'Claimed' : 'Unclaimed'}</div>
-          </div>
-          <button onClick={() => toggleActive(p)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-[Barlow] font-medium transition-colors ${p.is_active ? 'bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/30' : 'bg-[#22C55E]/20 text-[#22C55E] border border-[#22C55E]/30'}`}>
-            {p.is_active ? 'Deactivate' : 'Activate'}
+      {/* Filter buttons */}
+      <div className="flex gap-2">
+        {(['all', 'claimed', 'unclaimed'] as const).map((f) => (
+          <button key={f} onClick={() => setFilter(f)}
+            className={`flex-1 py-2 rounded-lg text-xs font-[Barlow] font-medium transition-all ${filter === f ? 'bg-[#C62828] text-white' : 'bg-[#252525] text-[#9CA3AF] border border-[#333]'}`}>
+            {f === 'all' ? 'All' : f === 'claimed' ? 'Claimed' : 'Unclaimed'}
           </button>
-        </GlassCard>
-      ))}
+        ))}
+      </div>
+
+      <p className="text-[#9CA3AF] text-xs font-[Barlow]">{filteredPlayers.length} {filter === 'all' ? 'total' : filter} players</p>
+      {filteredPlayers.map((p) => {
+        const fr = fargoByPlayer.get(p.id);
+        return (
+          <GlassCard key={p.id} className="p-3 flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <div className={`font-[Barlow] font-semibold text-sm truncate ${p.is_active ? 'text-[#E8E2D6]' : 'text-[#6B7280] line-through'}`}>
+                {p.full_name}
+                {typeof fr === 'number' && (
+                  <span className="ml-2 text-[#9CA3AF] font-normal">FR {fr}</span>
+                )}
+              </div>
+              <div className="text-[#6B7280] text-xs font-[Barlow]">{p.profile_id ? 'Claimed' : 'Unclaimed'}</div>
+            </div>
+            <button onClick={() => toggleActive(p)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-[Barlow] font-medium transition-colors ${p.is_active ? 'bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/30' : 'bg-[#22C55E]/20 text-[#22C55E] border border-[#22C55E]/30'}`}>
+              {p.is_active ? 'Deactivate' : 'Activate'}
+            </button>
+          </GlassCard>
+        );
+      })}
     </div>
   );
 }
