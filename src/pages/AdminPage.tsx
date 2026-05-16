@@ -600,10 +600,37 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const [newFargo, setNewFargo]     = useState('');
   const [addLoading, setAddLoading] = useState(false);
   const [addError, setAddError]     = useState('');
+  const [activeToggling, setActiveToggling] = useState<string | null>(null);
+  const [activeError, setActiveError] = useState('');
 
   const toggleActive = async (p: Player) => {
-    await supabase.from('players').update({ is_active: !p.is_active }).eq('id', p.id);
-    qc.invalidateQueries({ queryKey: ['admin-players'] });
+    setActiveToggling(p.id);
+    setActiveError('');
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      setActiveError('Session expired — please log in again.');
+      setActiveToggling(null);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/set-player-active`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ player_id: p.id, is_active: !p.is_active }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json.error) {
+        setActiveError(json.error ?? 'Could not update player status.');
+        return;
+      }
+      qc.invalidateQueries({ queryKey: ['admin-players'] });
+      qc.invalidateQueries({ queryKey: ['audit-events'] });
+    } catch {
+      setActiveError('Network error — please try again.');
+    } finally {
+      setActiveToggling(null);
+    }
   };
 
   const handleAddPlayer = async () => {
@@ -670,6 +697,8 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
         </Button>
       )}
 
+      {activeError && <p className="text-[#EF4444] text-xs font-[Barlow]">{activeError}</p>}
+
       {/* Filter buttons */}
       <div className="flex gap-2">
         {(['all', 'claimed', 'unclaimed'] as const).map((f) => (
@@ -694,9 +723,9 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
               </div>
               <div className="text-[#6B7280] text-xs font-[Barlow]">{p.profile_id ? 'Claimed' : 'Unclaimed'}</div>
             </div>
-            <button onClick={() => toggleActive(p)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-[Barlow] font-medium transition-colors ${p.is_active ? 'bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/30' : 'bg-[#22C55E]/20 text-[#22C55E] border border-[#22C55E]/30'}`}>
-              {p.is_active ? 'Deactivate' : 'Activate'}
+            <button onClick={() => toggleActive(p)} disabled={activeToggling === p.id}
+              className={`px-3 py-1.5 rounded-lg text-xs font-[Barlow] font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${p.is_active ? 'bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/30' : 'bg-[#22C55E]/20 text-[#22C55E] border border-[#22C55E]/30'}`}>
+              {activeToggling === p.id ? 'Saving…' : p.is_active ? 'Deactivate' : 'Activate'}
             </button>
           </GlassCard>
         );
