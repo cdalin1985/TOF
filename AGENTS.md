@@ -38,3 +38,31 @@ When doing TOC work:
 - Venues = Eagles 4040 and Valley Hub.
 - Treasury visible to all players.
 - Only super_admin manages treasury.
+
+## Agent dev tooling
+
+### GitNexus MCP (one-time per machine)
+
+GitNexus is an MCP server that indexes this repo into a code-intelligence
+graph. Each Windows machine that runs Claude Code on this repo installs it
+once — config lives in your user-scope `.claude.json`, not in this repo.
+
+```cmd
+cd C:\Users\chase\Desktop\claude-agent0toc
+npm install -g gitnexus
+gitnexus setup
+```
+
+Requires Node ≥ 22. To skip native tree-sitter-dart/proto builds (no
+python/make/g++ needed), prefix the install with
+`set GITNEXUS_SKIP_OPTIONAL_GRAMMARS=1`.
+
+`gitnexus setup` auto-detects Claude Code and writes absolute-path MCP
+config. To build the graph for this repo, run `npx gitnexus analyze` from
+the repo root.
+
+Manual fallback (skip global install):
+`claude mcp add gitnexus -- cmd /c npx -y gitnexus@latest mcp`. Slower;
+first launch can hit Claude Code's ~30s MCP_TIMEOUT on cold npm cache.
+
+Reference: https://github.com/abhigyanpatwari/GitNexus
