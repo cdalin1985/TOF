@@ -6,3 +6,7 @@ dist
 .DS_Store
 
 .vercel
+
+# Local diagnostic logs
+npm-install-log.txt
+npm-build-log.txt
