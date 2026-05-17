@@ -20,10 +20,11 @@ const DISCIPLINES: Discipline[] = ['8 Ball', '9 Ball', '10 Ball'];
 const DISC_EMOJI: Record<Discipline, string> = { '8 Ball': '🎱', '9 Ball': '🔵', '10 Ball': '🟡' };
 type HistoryFilter = 'All' | 'Wins' | 'Losses' | '8 Ball' | '9 Ball' | '10 Ball';
 
-function canChallenge(myPos: number, theirPos: number, myRank: number) {
+function canChallenge(myPos: number, theirPos: number, isFirstChallenge: boolean): boolean {
   if (myPos === theirPos) return false;
-  if (myRank === 1) return true;
-  if (myRank <= 10) return Math.abs(myRank - myPos) <= 5 || Math.abs(myPos - theirPos) <= 5;
+  if (myPos === 1) return true; // #1 can challenge anyone (top-5 obligation)
+  if (myPos <= 10) return Math.abs(myPos - theirPos) <= 5; // top-10: ±5 in either direction
+  if (isFirstChallenge) return theirPos < myPos && (myPos - theirPos) <= 10;
   return theirPos < myPos && (myPos - theirPos) <= 5;
 }
 
@@ -37,9 +38,10 @@ export default function PlayerPage() {
 
   const targetRanking = rankings.find((r) => r.player.id === id);
   const myRanking     = rankings.find((r) => r.player.id === myPlayer?.id);
+  const isFirstChallenge = (myRanking?.stats?.challenges_issued ?? 0) === 0;
 
   const eligible = myRanking && targetRanking
-    ? canChallenge(myRanking.ranking.position, targetRanking.ranking.position, myRanking.ranking.position)
+    ? canChallenge(myRanking.ranking.position, targetRanking.ranking.position, isFirstChallenge)
     : false;
 
   const { data: matches = [], isLoading: matchesLoading } = useQuery<Match[]>({
