@@ -921,7 +921,6 @@ function Rank1Tab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
 
 type SettingsFormState = {
   min_race: number | '';
-  max_race: number | '';
   challenge_range: number | '';
   cooldown_hours: number | '';
   challenge_expiry_days: number | '';
@@ -988,7 +987,6 @@ function SettingsTab() {
 
   const form: SettingsFormState = {
     min_race: edits.min_race ?? settings.min_race,
-    max_race: edits.max_race ?? settings.max_race,
     challenge_range: edits.challenge_range ?? settings.challenge_range,
     cooldown_hours: edits.cooldown_hours ?? settings.cooldown_hours,
     challenge_expiry_days: edits.challenge_expiry_days ?? settings.challenge_expiry_days,

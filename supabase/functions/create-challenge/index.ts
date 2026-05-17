@@ -69,7 +69,7 @@ serve(async (req) => {
       .single();
 
     const minRace = settings?.min_race ?? 6;
-    const maxRace = settings?.max_race ?? 15;
+    const maxRace = settings?.max_race;
     const challengeRange = settings?.challenge_range ?? 5;
     const firstChallengeRange = settings?.first_challenge_range ?? 10;
     const challengeExpiryDays = settings?.challenge_expiry_days ?? 7;
@@ -146,12 +146,12 @@ serve(async (req) => {
     await supabase.from('notifications').insert({
       player_id: challenged_player_id,
       type: 'challenge_received',
-      title: `âš”ï¸ ${challengerPlayer?.full_name} challenged you!`,
-      body: `${discipline} Â· Race to ${race_length}. You have ${challengeExpiryDays} days to respond.`,
+      title: `${challengerPlayer?.full_name} challenged you!`,
+      body: `${discipline} - Race to ${race_length}. You have ${challengeExpiryDays} days to respond.`,
       reference_id: challenge.id,
       reference_type: 'challenge',
     });
-    await sendPush(supabase, challenged_player_id, `âš”ï¸ ${challengerPlayer?.full_name} challenged you!`, `${discipline} Â· Race to ${race_length}. Tap to respond.`, '/challenges');
+    await sendPush(supabase, challenged_player_id, `${challengerPlayer?.full_name} challenged you!`, `${discipline} - Race to ${race_length}. Tap to respond.`, '/challenges');
 
     const { data: challengedPlayer } = await supabase.from('players').select('full_name').eq('id', challenged_player_id).single();
     await supabase.from('activity_feed').insert({ event_type: 'challenge_issued', headline: `${challengerPlayer?.full_name} challenged ${challengedPlayer?.full_name} to ${discipline}!`, actor_player_id: challenger.id });

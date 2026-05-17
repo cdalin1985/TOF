@@ -86,7 +86,7 @@ export interface Database {
           player2_score: number;
           winner_id: string | null;
           loser_id: string | null;
-          status: 'scheduled' | 'in_progress' | 'submitted' | 'confirmed' | 'disputed' | 'resolved';
+          status: 'scheduled' | 'in_progress' | 'submitted' | 'confirming' | 'confirmed' | 'disputed' | 'resolved';
           player1_submitted: boolean;
           player2_submitted: boolean;
           player1_confirmed: boolean;
@@ -200,7 +200,7 @@ export interface Database {
           venues: string[];
           disciplines: string[];
           min_race: number;
-          max_race: number;
+          max_race: number | null;
           challenge_range: number;
           cooldown_hours: number;
           challenge_expiry_days: number;
