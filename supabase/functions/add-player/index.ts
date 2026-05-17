@@ -251,6 +251,13 @@ serve(async (req) => {
       },
     });
 
+    await supabase.from('activity_feed').insert({
+      event_type: 'player_added',
+      headline: `Admin added ${fullName} to the league at #${rankingPosition}.`,
+      detail: fargoRating != null ? `Fargo rating ${fargoRating} · unclaimed profile` : 'Unclaimed profile',
+      actor_player_id: player.id,
+    });
+
     return json({
       success: true,
       player: {

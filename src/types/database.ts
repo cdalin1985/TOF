@@ -91,8 +91,8 @@ export interface Database {
           player2_submitted: boolean;
           player1_confirmed: boolean;
           player2_confirmed: boolean;
-          player1_payment_method: 'envelope' | 'digital' | null;
-          player2_payment_method: 'envelope' | 'digital' | null;
+          player1_payment_method: 'cash_envelope' | 'paypal' | 'cash_app' | 'venmo' | null;
+          player2_payment_method: 'cash_envelope' | 'paypal' | 'cash_app' | 'venmo' | null;
           scheduled_at: string;
           started_at: string | null;
           completed_at: string | null;
@@ -154,10 +154,27 @@ export interface Database {
           defender_wins: number;
           challenger_wins: number;
           forfeit_wins: number;
+          forfeits: number;
           best_rank_achieved: number | null;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['player_season_stats']['Row'], 'id' | 'updated_at'>;
+        Insert: {
+          id?: string;
+          player_id: string;
+          wins?: number;
+          losses?: number;
+          current_streak?: number;
+          best_streak?: number;
+          matches_played?: number;
+          challenges_issued?: number;
+          challenges_received?: number;
+          defender_wins?: number;
+          challenger_wins?: number;
+          forfeit_wins?: number;
+          forfeits?: number;
+          best_rank_achieved?: number | null;
+          updated_at?: string;
+        };
         Update: Partial<Database['public']['Tables']['player_season_stats']['Insert']>;
       };
       player_discipline_stats: {
@@ -175,10 +192,28 @@ export interface Database {
           challenges_issued: number;
           challenges_received: number;
           forfeit_wins: number;
+          forfeits: number;
           total_race_length: number;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['player_discipline_stats']['Row'], 'id' | 'updated_at'>;
+        Insert: {
+          id?: string;
+          player_id: string;
+          discipline: '8 Ball' | '9 Ball' | '10 Ball';
+          matches_played?: number;
+          wins?: number;
+          losses?: number;
+          current_streak?: number;
+          best_streak?: number;
+          challenger_wins?: number;
+          defender_wins?: number;
+          challenges_issued?: number;
+          challenges_received?: number;
+          forfeit_wins?: number;
+          forfeits?: number;
+          total_race_length?: number;
+          updated_at?: string;
+        };
         Update: Partial<Database['public']['Tables']['player_discipline_stats']['Insert']>;
       };
       treasury_ledger: {
@@ -189,10 +224,69 @@ export interface Database {
           description: string;
           created_by: string;
           reversed_entry_id: string | null;
+          source_type: string | null;
+          source_id: string | null;
+          player_id: string | null;
+          metadata: Json;
           created_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['treasury_ledger']['Row'], 'id' | 'created_at'>;
+        Insert: {
+          id?: string;
+          entry_type: 'credit' | 'debit' | 'correction' | 'reversal';
+          amount_cents: number;
+          description: string;
+          created_by: string;
+          reversed_entry_id?: string | null;
+          source_type?: string | null;
+          source_id?: string | null;
+          player_id?: string | null;
+          metadata?: Json;
+          created_at?: string;
+        };
         Update: Partial<Database['public']['Tables']['treasury_ledger']['Insert']>;
+      };
+      challenge_forfeiture_events: {
+        Row: {
+          id: string;
+          challenge_id: string;
+          challenger_id: string;
+          forfeiting_player_id: string;
+          winner_id: string;
+          loser_id: string;
+          previous_challenge_status: string;
+          challenger_previous_position: number | null;
+          forfeiting_previous_position: number | null;
+          challenger_new_position: number | null;
+          forfeiting_new_position: number | null;
+          cooldown_id: string | null;
+          activity_event_id: string | null;
+          notification_ids: string[];
+          reversed_at: string | null;
+          reversed_by_profile_id: string | null;
+          created_at: string;
+          metadata: Json;
+        };
+        Insert: {
+          id?: string;
+          challenge_id: string;
+          challenger_id: string;
+          forfeiting_player_id: string;
+          winner_id: string;
+          loser_id: string;
+          previous_challenge_status: string;
+          challenger_previous_position?: number | null;
+          forfeiting_previous_position?: number | null;
+          challenger_new_position?: number | null;
+          forfeiting_new_position?: number | null;
+          cooldown_id?: string | null;
+          activity_event_id?: string | null;
+          notification_ids?: string[];
+          reversed_at?: string | null;
+          reversed_by_profile_id?: string | null;
+          created_at?: string;
+          metadata?: Json;
+        };
+        Update: Partial<Database['public']['Tables']['challenge_forfeiture_events']['Insert']>;
       };
       league_settings: {
         Row: {
@@ -227,8 +321,38 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['audit_events']['Insert']>;
       };
     };
-    Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Views: {
+      treasury_ledger_effects: {
+        Row: Database['public']['Tables']['treasury_ledger']['Row'] & {
+          effect_cents: number;
+        };
+      };
+      treasury_summary: {
+        Row: {
+          total_credit_cents: number;
+          total_debit_cents: number;
+          balance_cents: number;
+          entry_count: number;
+          last_entry_at: string | null;
+        };
+      };
+    };
+    Functions: {
+      apply_challenge_decline_forfeit: {
+        Args: {
+          p_challenge_id: string;
+          p_actor_profile_id?: string | null;
+        };
+        Returns: string;
+      };
+      reverse_challenge_decline_forfeit: {
+        Args: {
+          p_challenge_id: string;
+          p_actor_profile_id: string;
+        };
+        Returns: void;
+      };
+    };
     Enums: Record<string, never>;
   };
 }
@@ -246,6 +370,9 @@ export type Cooldown = Database['public']['Tables']['cooldowns']['Row'];
 export type PlayerSeasonStats = Database['public']['Tables']['player_season_stats']['Row'];
 export type PlayerDisciplineStats = Database['public']['Tables']['player_discipline_stats']['Row'];
 export type TreasuryEntry = Database['public']['Tables']['treasury_ledger']['Row'];
+export type ChallengeForfeitureEvent = Database['public']['Tables']['challenge_forfeiture_events']['Row'];
+export type TreasuryLedgerEffect = Database['public']['Views']['treasury_ledger_effects']['Row'];
+export type TreasurySummary = Database['public']['Views']['treasury_summary']['Row'];
 export type LeagueSettings = Database['public']['Tables']['league_settings']['Row'];
 export type AuditEvent = Database['public']['Tables']['audit_events']['Row'];
 

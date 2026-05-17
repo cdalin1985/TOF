@@ -3,37 +3,21 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../lib/supabase';
 import { GlassCard } from '../components/GlassCard';
 import { Badge } from '../components/Badge';
-import type { TreasuryEntry } from '../types/database';
 import { formatDate } from '../utils/time';
-
-function fmt(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`;
-}
+import { fetchTreasurySnapshot, formatCents, ledgerSignFor } from '../lib/treasury';
 
 export default function TreasuryPage() {
   const navigate = useNavigate();
 
-  const { data: entries = [], isLoading } = useQuery<TreasuryEntry[]>({
+  const { data, isLoading } = useQuery({
     queryKey: ['treasury'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('treasury_ledger')
-        .select('*')
-        .order('created_at', { ascending: false });
-      return data ?? [];
-    },
+    queryFn: () => fetchTreasurySnapshot(),
   });
 
-  const totalCredits = entries
-    .filter((e) => e.entry_type === 'credit')
-    .reduce((sum, e) => sum + e.amount_cents, 0);
-  const totalDebits = entries
-    .filter((e) => e.entry_type === 'debit')
-    .reduce((sum, e) => sum + e.amount_cents, 0);
-  const balance = totalCredits - totalDebits;
+  const summary = data?.summary;
+  const entries = data?.entries ?? [];
 
   return (
     <div className="min-h-screen px-4 pt-4 pb-8">
@@ -60,27 +44,27 @@ export default function TreasuryPage() {
         <GlassCard className="p-4 text-center">
           <TrendingUp size={18} className="text-[#22C55E] mx-auto mb-1" />
           <div className="font-[Azeret_Mono] font-bold text-base text-[#22C55E]">
-            {fmt(totalCredits)}
+            {formatCents(summary?.total_credit_cents ?? 0)}
           </div>
           <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">Total In</div>
         </GlassCard>
         <GlassCard className="p-4 text-center">
           <TrendingDown size={18} className="text-[#EF4444] mx-auto mb-1" />
           <div className="font-[Azeret_Mono] font-bold text-base text-[#EF4444]">
-            {fmt(totalDebits)}
+            {formatCents(summary?.total_debit_cents ?? 0)}
           </div>
           <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">Total Out</div>
         </GlassCard>
         <GlassCard className="p-4 text-center">
           <DollarSign
             size={18}
-            className={`mx-auto mb-1 ${balance >= 0 ? 'text-[#E8E2D6]' : 'text-[#EF4444]'}`}
+            className={`mx-auto mb-1 ${(summary?.balance_cents ?? 0) >= 0 ? 'text-[#E8E2D6]' : 'text-[#EF4444]'}`}
           />
           <div
             className="font-[Azeret_Mono] font-bold text-base"
-            style={{ color: balance >= 0 ? '#E8E2D6' : '#EF4444' }}
+            style={{ color: (summary?.balance_cents ?? 0) >= 0 ? '#E8E2D6' : '#EF4444' }}
           >
-            {fmt(Math.abs(balance))}
+            {formatCents(Math.abs(summary?.balance_cents ?? 0))}
           </div>
           <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">Balance</div>
         </GlassCard>
@@ -107,14 +91,18 @@ export default function TreasuryPage() {
             </p>
           ) : (
             <div className="space-y-1">
-              {entries.map((e) => {
-                const isCredit = e.entry_type === 'credit';
-                const isDebit  = e.entry_type === 'debit';
-                const color    = isCredit ? '#22C55E' : isDebit ? '#EF4444' : '#9CA3AF';
-                const sign     = isCredit ? '+' : isDebit ? '−' : '';
+              {entries.map((entry) => {
+                const isCredit = entry.entry_type === 'credit';
+                const isDebit  = entry.entry_type === 'debit';
+                const color    = entry.effect_cents > 0
+                  ? '#22C55E'
+                  : entry.effect_cents < 0
+                    ? '#EF4444'
+                    : '#9CA3AF';
+                const sign = ledgerSignFor(entry.effect_cents);
                 return (
                   <div
-                    key={e.id}
+                    key={entry.id}
                     className="flex items-center gap-3 py-3 border-b border-white/5 last:border-0"
                   >
                     <div
@@ -123,10 +111,10 @@ export default function TreasuryPage() {
                     />
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-[Barlow] text-[#E8E2D6] leading-tight">
-                        {e.description}
+                        {entry.description}
                       </div>
                       <div className="text-xs text-[#6B7280] font-[Barlow] mt-0.5">
-                        {formatDate(e.created_at)}
+                        {formatDate(entry.created_at)}
                       </div>
                     </div>
                     <div className="text-right shrink-0">
@@ -134,11 +122,11 @@ export default function TreasuryPage() {
                         className="font-[Azeret_Mono] font-bold text-sm"
                         style={{ color }}
                       >
-                        {sign}{fmt(e.amount_cents)}
+                        {sign}{formatCents(Math.abs(entry.effect_cents))}
                       </div>
                       <div className="mt-1">
                         <Badge variant={isCredit ? 'win' : isDebit ? 'loss' : 'default'}>
-                          {e.entry_type}
+                          {entry.entry_type}
                         </Badge>
                       </div>
                     </div>

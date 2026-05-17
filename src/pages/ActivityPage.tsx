@@ -8,21 +8,46 @@ import { GlassCard } from '../components/GlassCard';
 import type { ActivityFeedItem } from '../types/database';
 import { formatDistanceToNow } from '../utils/time';
 
-type Filter = 'all' | 'match' | 'challenge' | 'ranking';
+type Filter = 'all' | 'match' | 'challenge' | 'ranking' | 'treasury' | 'admin';
 
 const EVENT_ICON: Record<string, string> = {
-  challenge_issued:   '⚔️',
-  challenge_accepted: '✅',
-  match_confirmed:    '🏆',
-  rank_change:        '📈',
-  rank1_penalty:      '📉',
+  challenge_issued:           '⚔️',
+  challenge_accepted:         '✅',
+  challenge_cancelled:        '🚫',
+  challenge_forfeited:        '⚖️',
+  challenge_forfeit_reversed: '↩️',
+  match_confirmed:            '🏆',
+  match_fee_recorded:         '💵',
+  dispute_resolved:           '⚖️',
+  rank_change:                '📈',
+  rank1_penalty:              '📉',
+  treasury_entry_credit:      '💰',
+  treasury_entry_debit:       '🧾',
+  treasury_entry_corrected:   '🛠',
+  treasury_entry_reversed:    '↩️',
+  player_added:               '➕',
+  player_activated:           '🟢',
+  player_deactivated:         '⏸️',
+  settings_changed:           '⚙️',
 };
 
 const FILTER_EVENTS: Record<Filter, string[] | null> = {
   all:       null,
-  match:     ['match_confirmed'],
-  challenge: ['challenge_issued', 'challenge_accepted'],
+  match:     ['match_confirmed', 'match_fee_recorded', 'dispute_resolved'],
+  challenge: [
+    'challenge_issued', 'challenge_accepted', 'challenge_cancelled',
+    'challenge_forfeited', 'challenge_forfeit_reversed',
+  ],
   ranking:   ['rank_change', 'rank1_penalty'],
+  treasury:  [
+    'treasury_entry_credit', 'treasury_entry_debit',
+    'treasury_entry_corrected', 'treasury_entry_reversed',
+    'match_fee_recorded',
+  ],
+  admin:     [
+    'player_added', 'player_activated', 'player_deactivated',
+    'settings_changed', 'dispute_resolved', 'challenge_forfeit_reversed',
+  ],
 };
 
 const FILTERS: { key: Filter; label: string }[] = [
@@ -30,6 +55,8 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'match',     label: 'Matches' },
   { key: 'challenge', label: 'Challenges' },
   { key: 'ranking',   label: 'Rankings' },
+  { key: 'treasury',  label: 'Treasury' },
+  { key: 'admin',     label: 'Admin' },
 ];
 
 export default function ActivityPage() {
@@ -69,13 +96,13 @@ export default function ActivityPage() {
       </p>
 
       {/* Filter tabs */}
-      <div className="flex gap-1 mb-5 bg-[#1A1A1A] rounded-xl p-1">
+      <div className="flex gap-1 mb-5 bg-[#1A1A1A] rounded-xl p-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
         {FILTERS.map((f) => (
           <button
             key={f.key}
             onClick={() => { setFilter(f.key); setLimit(40); }}
             className={[
-              'flex-1 py-2 rounded-lg text-xs font-[Barlow] font-medium transition-all duration-200',
+              'shrink-0 px-3 py-2 rounded-lg text-xs font-[Barlow] font-medium transition-all duration-200',
               filter === f.key ? 'bg-[#C62828] text-white' : 'text-[#9CA3AF]',
             ].join(' ')}
           >

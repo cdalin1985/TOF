@@ -64,7 +64,7 @@ serve(async (req) => {
       await supabase.from('activity_feed').insert({
         event_type: 'challenge_accepted',
         headline: `${challengedPlayer?.full_name} accepted ${challengerPlayer?.full_name}'s ${challenge.discipline} challenge!`,
-        detail: `Match at ${venue} on ${new Date(scheduled_at).toLocaleDateString()}`,
+        detail: `Match at ${venue} on ${new Date(scheduled_at).toLocaleDateString()} · race to ${challenge.race_length}`,
         actor_player_id: challenge.challenged_id,
       });
 
@@ -72,49 +72,67 @@ serve(async (req) => {
       if (challenge.challenged_id !== callerPlayer.id) return new Response(JSON.stringify({ error: 'Not authorized.' }), { headers: cors });
       if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Challenge is not pending.' }), { headers: cors });
 
-      await supabase.from('challenges').update({ status: 'declined' }).eq('id', challenge_id);
-
-      // No cooldown on the decliner — admin will confirm the spot move
-      // Notify admin players of the decline so they can confirm the forfeit
-      const { data: admins } = await supabase
-        .from('profiles')
-        .select('id')
-        .in('role', ['admin', 'super_admin']);
+      // A decline is a forfeit — ranking, cooldown, stats, activity, and notifications
+      // are all written by apply_challenge_decline_forfeit so admin can later reverse it.
+      const { error: rpcError } = await supabase.rpc('apply_challenge_decline_forfeit', {
+        p_challenge_id: challenge_id,
+        p_actor_profile_id: user.id,
+      });
+      if (rpcError) {
+        return new Response(JSON.stringify({ error: rpcError.message ?? 'Could not record decline as forfeit.' }), { headers: cors });
+      }
 
       const { data: challengerPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenger_id).single();
       const { data: challengedPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenged_id).single();
+      await Promise.all([
+        sendPush(
+          supabase,
+          challenge.challenger_id,
+          '⚖️ Challenge declined as forfeit',
+          `${challengedPlayer?.full_name ?? 'Your opponent'} declined your ${challenge.discipline} challenge — recorded as your win.`,
+          '/challenges',
+        ),
+        sendPush(
+          supabase,
+          challenge.challenged_id,
+          '⚖️ Decline recorded as forfeit',
+          `Declining ${challengerPlayer?.full_name ?? 'the challenger'} counted as a loss. Talk to an admin if this was an accident.`,
+          '/challenges',
+        ),
+      ]);
 
-      if (admins && admins.length > 0) {
-        // Find admin player records for notification
-        const { data: adminPlayers } = await supabase
-          .from('players')
-          .select('id')
-          .in('profile_id', admins.map((a: { id: string }) => a.id));
-
-        if (adminPlayers && adminPlayers.length > 0) {
-          await supabase.from('notifications').insert(
-            adminPlayers.map((ap: { id: string }) => ({
-              player_id: ap.id,
-              type: 'challenge_declined_admin',
-              title: `⚠️ Challenge declined — action needed`,
-              body: `${challengedPlayer?.full_name} declined ${challengerPlayer?.full_name}'s challenge. Confirm if ${challengerPlayer?.full_name} should take the spot.`,
-              reference_id: challenge_id,
-              reference_type: 'challenge',
-            }))
-          );
-        }
+    } else if (action === 'reverse_decline') {
+      const { data: actorProfile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+      if (!actorProfile || !['admin', 'super_admin'].includes(actorProfile.role)) {
+        return new Response(JSON.stringify({ error: 'Admin access required.' }), { status: 403, headers: cors });
       }
 
-      // Notify challenger of the decline
-      await supabase.from('notifications').insert({
-        player_id: challenge.challenger_id,
-        type: 'challenge_declined',
-        title: `❌ Challenge declined`,
-        body: `${challengedPlayer?.full_name} declined your ${challenge.discipline} challenge. An admin will confirm your spot move.`,
-        reference_id: challenge_id,
-        reference_type: 'challenge',
+      const { error: rpcError } = await supabase.rpc('reverse_challenge_decline_forfeit', {
+        p_challenge_id: challenge_id,
+        p_actor_profile_id: user.id,
       });
-      await sendPush(supabase, challenge.challenger_id, `❌ Challenge declined`, `${challengedPlayer?.full_name} declined. An admin will confirm your spot move.`, '/challenges');
+      if (rpcError) {
+        return new Response(JSON.stringify({ error: rpcError.message ?? 'Could not reverse decline.' }), { headers: cors });
+      }
+
+      const { data: challengerPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenger_id).single();
+      const { data: challengedPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenged_id).single();
+      await Promise.all([
+        sendPush(
+          supabase,
+          challenge.challenger_id,
+          '↩️ Decline reversed by admin',
+          `Your ${challenge.discipline} challenge with ${challengedPlayer?.full_name ?? 'the challenged player'} is pending again.`,
+          '/challenges',
+        ),
+        sendPush(
+          supabase,
+          challenge.challenged_id,
+          '↩️ Decline reversed by admin',
+          `${challengerPlayer?.full_name ?? 'The challenger'}'s challenge is pending again — respond when you can.`,
+          '/challenges',
+        ),
+      ]);
 
     } else if (action === 'wash') {
       // Either player can declare a scheduling wash — treated as if the challenge never happened
@@ -131,11 +149,27 @@ serve(async (req) => {
       // Also cancel the associated match if one was created
       await supabase.from('matches').update({ status: 'resolved' }).eq('challenge_id', challenge_id);
 
+      const { data: challengerPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenger_id).single();
+      const { data: challengedPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenged_id).single();
+      await supabase.from('activity_feed').insert({
+        event_type: 'challenge_cancelled',
+        headline: `${callerPlayer.full_name} declared a scheduling wash on ${challengerPlayer?.full_name ?? '?'} vs ${challengedPlayer?.full_name ?? '?'}.`,
+        detail: `${challenge.discipline} · race to ${challenge.race_length} · no ranking change, no cooldown`,
+        actor_player_id: callerPlayer.id,
+      });
+
     } else if (action === 'cancel') {
       // Challenger cancels their own pending challenge
       if (challenge.challenger_id !== callerPlayer.id) return new Response(JSON.stringify({ error: 'Not authorized.' }), { headers: cors });
       if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Can only cancel pending challenges.' }), { headers: cors });
       await supabase.from('challenges').update({ status: 'cancelled' }).eq('id', challenge_id);
+
+      const { data: challengedPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenged_id).single();
+      await supabase.from('activity_feed').insert({
+        event_type: 'challenge_cancelled',
+        headline: `${callerPlayer.full_name} cancelled their pending ${challenge.discipline} challenge to ${challengedPlayer?.full_name ?? '?'}.`,
+        actor_player_id: callerPlayer.id,
+      });
 
     } else {
       return new Response(JSON.stringify({ error: 'Invalid action.' }), { headers: cors });

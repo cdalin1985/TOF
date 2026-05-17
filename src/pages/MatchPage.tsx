@@ -1,7 +1,17 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Plus, Flag, CheckCircle, Wallet, Mail } from 'lucide-react';
+import {
+  ChevronLeft,
+  Flag,
+  CheckCircle,
+  Wallet,
+  Mail,
+  Smartphone,
+  Send,
+  Undo2,
+  ExternalLink,
+} from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
@@ -12,6 +22,12 @@ import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { formatDateTime } from '../utils/time';
 import type { Match } from '../types/database';
+import {
+  PAYMENT_METHODS,
+  paymentMethodUrl,
+  type PaymentMethod,
+  type PaymentMethodDefinition,
+} from '../lib/paymentMethods';
 
 function ScoreDisplay({ value, color }: { value: number; color: string }) {
   return (
@@ -21,14 +37,162 @@ function ScoreDisplay({ value, color }: { value: number; color: string }) {
       animate={{ scale: 1, opacity: 1 }}
       transition={{ type: 'spring', stiffness: 600, damping: 25 }}
       className="font-[Azeret_Mono] font-bold leading-none"
-      style={{ fontSize: '72px', color }}
+      style={{ fontSize: '88px', color }}
     >
       {value}
     </motion.div>
   );
 }
 
-type PaymentMethod = 'envelope' | 'digital';
+const PAYMENT_ICONS: Record<PaymentMethod, React.ComponentType<{ size?: number; className?: string }>> = {
+  cash_envelope: Mail,
+  paypal: Wallet,
+  cash_app: Smartphone,
+  venmo: Send,
+};
+
+type LastScoreAction = {
+  prevPlayer1Score: number;
+  prevPlayer2Score: number;
+  prevPlayer1Submitted: boolean;
+  prevPlayer2Submitted: boolean;
+};
+
+type ScoreboardSideProps = {
+  playerId: string;
+  name: string;
+  pos: number;
+  score: number;
+  isWinnerSide: boolean;
+  isLoserSide: boolean;
+  canScore: boolean;
+  raceComplete: boolean;
+  disabled: boolean;
+  onAddPoint: (playerId: string) => void;
+};
+
+function ScoreboardSide({
+  playerId,
+  name,
+  pos,
+  score,
+  isWinnerSide,
+  isLoserSide,
+  canScore,
+  raceComplete,
+  disabled,
+  onAddPoint,
+}: ScoreboardSideProps) {
+  const color = isWinnerSide ? '#22C55E' : isLoserSide ? '#EF4444' : '#E8E2D6';
+  const firstName = name.split(' ')[0];
+
+  return (
+    <button
+      type="button"
+      aria-label={`Add point for ${name}`}
+      onClick={() => onAddPoint(playerId)}
+      disabled={disabled}
+      className={[
+        'group flex-1 flex flex-col items-center justify-between gap-3 rounded-2xl py-5 px-3 min-h-[180px]',
+        'border transition-all duration-150',
+        'select-none',
+        disabled
+          ? 'border-[#2a2a2a] bg-[#1a1a1a]/40 cursor-default'
+          : 'border-[#333] bg-[#1f1f1f]/80 hover:border-[#22C55E]/40 hover:bg-[#22C55E]/5 active:scale-[0.98] active:bg-[#22C55E]/15 cursor-pointer',
+      ].join(' ')}
+    >
+      <div className="flex flex-col items-center gap-1.5">
+        <PoolBall position={pos} size={44} />
+        <div className="font-[Barlow] font-semibold text-sm text-[#E8E2D6] text-center max-w-[110px] leading-tight">
+          {firstName}
+        </div>
+      </div>
+      <ScoreDisplay value={score} color={color} />
+      {canScore && !raceComplete && (
+        <div className="text-[10px] font-[Barlow] uppercase tracking-wider text-[#22C55E]/70 group-active:text-[#22C55E]">
+          Tap to add point
+        </div>
+      )}
+      {raceComplete && isWinnerSide && (
+        <div className="text-[10px] font-[Barlow] uppercase tracking-wider text-[#22C55E]">
+          Race won
+        </div>
+      )}
+    </button>
+  );
+}
+
+type TableSideScoreboardProps = {
+  match: Match;
+  p1Name: string;
+  p2Name: string;
+  p1Pos: number;
+  p2Pos: number;
+  canScore: boolean;
+  submitting: boolean;
+  onAddPoint: (playerId: string) => void;
+};
+
+function TableSideScoreboard({
+  match,
+  p1Name,
+  p2Name,
+  p1Pos,
+  p2Pos,
+  canScore,
+  submitting,
+  onAddPoint,
+}: TableSideScoreboardProps) {
+  const raceComplete = match.player1_score >= match.race_length || match.player2_score >= match.race_length;
+  const totalGames = match.player1_score + match.player2_score;
+  const progressPct = Math.min(100, (Math.max(match.player1_score, match.player2_score) / match.race_length) * 100);
+  const disabled = !canScore || submitting || raceComplete;
+
+  return (
+    <GlassCard className="p-4 mb-5">
+      <div className="flex items-stretch gap-3">
+        <ScoreboardSide
+          playerId={match.player1_id}
+          name={p1Name}
+          pos={p1Pos}
+          score={match.player1_score}
+          isWinnerSide={match.winner_id === match.player1_id}
+          isLoserSide={match.winner_id != null && match.winner_id !== match.player1_id}
+          canScore={canScore}
+          raceComplete={raceComplete}
+          disabled={disabled}
+          onAddPoint={onAddPoint}
+        />
+        <div className="flex items-center font-[Bebas_Neue] text-2xl text-[#6B7280] px-1">VS</div>
+        <ScoreboardSide
+          playerId={match.player2_id}
+          name={p2Name}
+          pos={p2Pos}
+          score={match.player2_score}
+          isWinnerSide={match.winner_id === match.player2_id}
+          isLoserSide={match.winner_id != null && match.winner_id !== match.player2_id}
+          canScore={canScore}
+          raceComplete={raceComplete}
+          disabled={disabled}
+          onAddPoint={onAddPoint}
+        />
+      </div>
+
+      <div className="mt-5">
+        <div className="flex justify-between text-xs text-[#6B7280] font-[Barlow] mb-1">
+          <span>Race to {match.race_length}</span>
+          <span>{totalGames} games played</span>
+        </div>
+        <div className="h-1.5 bg-[#333] rounded-full overflow-hidden">
+          <div
+            className="h-full bg-[#C62828] rounded-full transition-all duration-500"
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+      </div>
+    </GlassCard>
+  );
+}
 
 export default function MatchPage() {
   const { id } = useParams<{ id: string }>();
@@ -36,11 +200,13 @@ export default function MatchPage() {
   const qc       = useQueryClient();
   const { player } = useAuthStore();
   const { data: rankings = [] } = useRankings();
-  const [submitting, setSubmitting]           = useState(false);
-  const [submitStep, setSubmitStep]           = useState<'winner' | 'payment' | null>(null);
-  const [submitError, setSubmitError]         = useState('');
-  const [submittedWinner, setSubmittedWinner] = useState<string | null>(null);
-  const [paymentMethod, setPaymentMethod]     = useState<PaymentMethod | null>(null);
+  const [submitting, setSubmitting]               = useState(false);
+  const [submitStep, setSubmitStep]               = useState<'winner' | 'payment' | null>(null);
+  const [submitError, setSubmitError]             = useState('');
+  const [submittedWinner, setSubmittedWinner]     = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod]         = useState<PaymentMethod | null>(null);
+  const [lastScoreAction, setLastScoreAction]     = useState<LastScoreAction | null>(null);
+  const [undoing, setUndoing]                     = useState(false);
 
   const { data: match, isLoading } = useQuery<Match>({
     queryKey: ['match', id],
@@ -76,11 +242,6 @@ export default function MatchPage() {
   const p1Pos  = rankings.find((r) => r.player.id === match.player1_id)?.ranking.position ?? 1;
   const p2Pos  = rankings.find((r) => r.player.id === match.player2_id)?.ranking.position ?? 2;
 
-  const myScore    = isPlayer1 ? match.player1_score : match.player2_score;
-  const theirScore = isPlayer1 ? match.player2_score : match.player1_score;
-  const myId       = isPlayer1 ? match.player1_id : match.player2_id;
-  const theirId    = isPlayer1 ? match.player2_id : match.player1_id;
-
   const callFn = async (path: string, body: object) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Session expired — please log in again.');
@@ -96,26 +257,50 @@ export default function MatchPage() {
     }
   };
 
-  const handleScoreUpdate = async (winnerId: string) => {
+  const sendScore = async (p1Score: number, p2Score: number) => {
+    await callFn('update-match-score', {
+      match_id: match.id,
+      my_score: isPlayer1 ? p1Score : p2Score,
+      opponent_score: isPlayer1 ? p2Score : p1Score,
+    });
+    qc.invalidateQueries({ queryKey: ['match', id] });
+  };
+
+  const handleAddPoint = async (winnerId: string) => {
     if (!amInMatch || submitting) return;
-    const newMyScore    = winnerId === myId    ? myScore + 1 : myScore;
-    const newTheirScore = winnerId === theirId ? theirScore + 1 : theirScore;
+    const snapshot: LastScoreAction = {
+      prevPlayer1Score: match.player1_score,
+      prevPlayer2Score: match.player2_score,
+      prevPlayer1Submitted: match.player1_submitted,
+      prevPlayer2Submitted: match.player2_submitted,
+    };
+    const newP1 = winnerId === match.player1_id ? match.player1_score + 1 : match.player1_score;
+    const newP2 = winnerId === match.player2_id ? match.player2_score + 1 : match.player2_score;
+
     setSubmitting(true);
     setSubmitError('');
-    const p1Score = isPlayer1 ? newMyScore : newTheirScore;
-    const p2Score = isPlayer1 ? newTheirScore : newMyScore;
     try {
-      await callFn('update-match-score', {
-        match_id: match.id,
-        my_score: isPlayer1 ? p1Score : p2Score,
-        opponent_score: isPlayer1 ? p2Score : p1Score,
-      });
+      await sendScore(newP1, newP2);
+      setLastScoreAction(snapshot);
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : 'Score update failed.');
     } finally {
       setSubmitting(false);
     }
-    qc.invalidateQueries({ queryKey: ['match', id] });
+  };
+
+  const handleUndoLastPoint = async () => {
+    if (!lastScoreAction || undoing) return;
+    setUndoing(true);
+    setSubmitError('');
+    try {
+      await sendScore(lastScoreAction.prevPlayer1Score, lastScoreAction.prevPlayer2Score);
+      setLastScoreAction(null);
+    } catch (e) {
+      setSubmitError(e instanceof Error ? e.message : 'Undo failed.');
+    } finally {
+      setUndoing(false);
+    }
   };
 
   const handleSubmitResult = async () => {
@@ -132,6 +317,7 @@ export default function MatchPage() {
     setSubmitting(false);
     if (json.error) { setSubmitError(json.error); return; }
     setSubmitStep(null);
+    setLastScoreAction(null);
     qc.invalidateQueries({ queryKey: ['match', id] });
     qc.invalidateQueries({ queryKey: ['rankings'] });
     qc.invalidateQueries({ queryKey: ['matches'] });
@@ -139,10 +325,13 @@ export default function MatchPage() {
     qc.invalidateQueries({ queryKey: ['home-pending-challenges'] });
     qc.invalidateQueries({ queryKey: ['notifications'] });
     qc.invalidateQueries({ queryKey: ['activity-feed'] });
+    qc.invalidateQueries({ queryKey: ['treasury'] });
   };
 
   const hasSubmitted = (isPlayer1 && match.player1_submitted) || (isPlayer2 && match.player2_submitted);
   const isWinner    = match.winner_id === player?.id;
+  const canScore    = match.status === 'in_progress' && amInMatch && !hasSubmitted;
+  const showUndo    = canScore && lastScoreAction !== null;
 
   return (
     <div className="min-h-screen px-4 pt-4 pb-8">
@@ -162,69 +351,28 @@ export default function MatchPage() {
         </div>
       </div>
 
-      {/* Scoreboard */}
-      <GlassCard className="p-6 mb-5">
-        <div className="flex items-center justify-around">
-          <div className="flex flex-col items-center gap-2">
-            <PoolBall position={p1Pos} size={52} />
-            <div className="font-[Barlow] font-semibold text-sm text-[#E8E2D6] text-center max-w-[80px] leading-tight">
-              {p1Name.split(' ')[0]}
-            </div>
-            <ScoreDisplay
-              value={match.player1_score}
-              color={match.winner_id === match.player1_id ? '#22C55E'
-                   : match.winner_id && match.winner_id !== match.player1_id ? '#EF4444'
-                   : '#E8E2D6'}
-            />
-            {match.status === 'in_progress' && amInMatch && !hasSubmitted && (
-              <button
-                onClick={() => handleScoreUpdate(match.player1_id)}
-                disabled={submitting || match.player1_score >= match.race_length || match.player2_score >= match.race_length}
-                className="w-10 h-10 rounded-full bg-[#22C55E]/20 border border-[#22C55E]/40 flex items-center justify-center active:scale-95 transition-transform disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                <Plus size={20} className="text-[#22C55E]" />
-              </button>
-            )}
-          </div>
+      <TableSideScoreboard
+        match={match}
+        p1Name={p1Name}
+        p2Name={p2Name}
+        p1Pos={p1Pos}
+        p2Pos={p2Pos}
+        canScore={canScore}
+        submitting={submitting}
+        onAddPoint={handleAddPoint}
+      />
 
-          <div className="font-[Bebas_Neue] text-3xl text-[#6B7280]">VS</div>
-
-          <div className="flex flex-col items-center gap-2">
-            <PoolBall position={p2Pos} size={52} />
-            <div className="font-[Barlow] font-semibold text-sm text-[#E8E2D6] text-center max-w-[80px] leading-tight">
-              {p2Name.split(' ')[0]}
-            </div>
-            <ScoreDisplay
-              value={match.player2_score}
-              color={match.winner_id === match.player2_id ? '#22C55E'
-                   : match.winner_id && match.winner_id !== match.player2_id ? '#EF4444'
-                   : '#E8E2D6'}
-            />
-            {match.status === 'in_progress' && amInMatch && !hasSubmitted && (
-              <button
-                onClick={() => handleScoreUpdate(match.player2_id)}
-                disabled={submitting || match.player1_score >= match.race_length || match.player2_score >= match.race_length}
-                className="w-10 h-10 rounded-full bg-[#22C55E]/20 border border-[#22C55E]/40 flex items-center justify-center active:scale-95 transition-transform disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                <Plus size={20} className="text-[#22C55E]" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="mt-6">
-          <div className="flex justify-between text-xs text-[#6B7280] font-[Barlow] mb-1">
-            <span>Race to {match.race_length}</span>
-            <span>{Math.max(match.player1_score, match.player2_score)}/{match.race_length} games played</span>
-          </div>
-          <div className="h-1.5 bg-[#333] rounded-full overflow-hidden">
-            <div
-              className="h-full bg-[#C62828] rounded-full transition-all duration-500"
-              style={{ width: `${(Math.max(match.player1_score, match.player2_score) / match.race_length) * 100}%` }}
-            />
-          </div>
-        </div>
-      </GlassCard>
+      {showUndo && (
+        <button
+          type="button"
+          onClick={handleUndoLastPoint}
+          disabled={undoing}
+          className="w-full flex items-center justify-center gap-2 py-2.5 mb-5 rounded-xl bg-[#252525]/80 border border-[#333] text-[#E8E2D6] text-sm font-[Barlow] active:scale-[0.98] transition-transform disabled:opacity-50"
+        >
+          <Undo2 size={16} />
+          {undoing ? 'Undoing…' : 'Undo last point'}
+        </button>
+      )}
 
       {amInMatch && (
         <div className="space-y-3">
@@ -374,38 +522,44 @@ export default function MatchPage() {
                     How are you paying your $5 match fee?
                   </p>
                   <div className="space-y-3 mb-5">
-                    <button
-                      onClick={() => setPaymentMethod('envelope')}
-                      className={[
-                        'w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left',
-                        paymentMethod === 'envelope'
-                          ? 'border-[#C62828] bg-[#C62828]/10'
-                          : 'border-[#333] bg-[#252525]/50',
-                      ].join(' ')}
-                    >
-                      <Mail size={24} className="text-[#9CA3AF] shrink-0" />
-                      <div>
-                        <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">Used the envelope</div>
-                        <div className="text-[#6B7280] text-xs font-[Barlow] mt-0.5">Cash in the drop box at the venue</div>
-                      </div>
-                      {paymentMethod === 'envelope' && <CheckCircle size={20} className="text-[#C62828] ml-auto" />}
-                    </button>
-                    <button
-                      onClick={() => setPaymentMethod('digital')}
-                      className={[
-                        'w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left',
-                        paymentMethod === 'digital'
-                          ? 'border-[#C62828] bg-[#C62828]/10'
-                          : 'border-[#333] bg-[#252525]/50',
-                      ].join(' ')}
-                    >
-                      <Wallet size={24} className="text-[#9CA3AF] shrink-0" />
-                      <div>
-                        <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">Paid digitally</div>
-                        <div className="text-[#6B7280] text-xs font-[Barlow] mt-0.5">Venmo, Cash App, or PayPal</div>
-                      </div>
-                      {paymentMethod === 'digital' && <CheckCircle size={20} className="text-[#C62828] ml-auto" />}
-                    </button>
+                    {PAYMENT_METHODS.map((method: PaymentMethodDefinition) => {
+                      const Icon = PAYMENT_ICONS[method.id];
+                      const selected = paymentMethod === method.id;
+                      const link = method.urlEnv ? paymentMethodUrl(method.id) : undefined;
+                      const helperText = method.urlEnv && !link
+                        ? `${method.helper} (link not configured yet)`
+                        : method.helper;
+                      return (
+                        <button
+                          key={method.id}
+                          onClick={() => setPaymentMethod(method.id)}
+                          className={[
+                            'w-full flex items-center gap-3 p-4 rounded-xl border transition-all text-left',
+                            selected
+                              ? 'border-[#C62828] bg-[#C62828]/10'
+                              : 'border-[#333] bg-[#252525]/50',
+                          ].join(' ')}
+                        >
+                          <Icon size={22} className="text-[#9CA3AF] shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">{method.label}</div>
+                            <div className="text-[#6B7280] text-xs font-[Barlow] mt-0.5">{helperText}</div>
+                            {link && (
+                              <a
+                                href={link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 mt-1.5 text-[10px] uppercase tracking-wider font-[Barlow] text-[#22C55E] underline decoration-dotted"
+                              >
+                                Open {method.label} <ExternalLink size={10} />
+                              </a>
+                            )}
+                          </div>
+                          {selected && <CheckCircle size={20} className="text-[#C62828]" />}
+                        </button>
+                      );
+                    })}
                   </div>
                   {submitError && <p className="text-[#EF4444] text-xs font-[Barlow] mb-3">{submitError}</p>}
                   <div className="flex gap-2">

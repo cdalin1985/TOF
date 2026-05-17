@@ -79,5 +79,12 @@ serve(async (req) => {
     },
   });
 
+  await supabase.from('activity_feed').insert({
+    event_type: body.is_active ? 'player_activated' : 'player_deactivated',
+    headline: `Admin ${body.is_active ? 'activated' : 'deactivated'} ${existingPlayer.full_name}.`,
+    detail: existingPlayer.profile_id ? 'Claimed profile' : 'Unclaimed profile',
+    actor_player_id: body.player_id,
+  });
+
   return json({ success: true, changed: true, player: updatedPlayer });
 });

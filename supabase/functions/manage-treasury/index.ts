@@ -35,6 +35,23 @@ serve(async (req) => {
       detail: { entry_type, amount_cents, description },
     });
 
+    const eventType =
+      entry_type === 'reversal' ? 'treasury_entry_reversed' :
+      entry_type === 'correction' ? 'treasury_entry_corrected' :
+      entry_type === 'debit' ? 'treasury_entry_debit' :
+      'treasury_entry_credit';
+    const dollars = `$${(Math.abs(amount_cents) / 100).toFixed(2)}`;
+    const verb =
+      entry_type === 'credit' ? `added ${dollars} credit` :
+      entry_type === 'debit' ? `recorded ${dollars} debit` :
+      entry_type === 'correction' ? `posted a ${dollars} correction` :
+      `reversed an entry (${dollars})`;
+    await supabase.from('activity_feed').insert({
+      event_type: eventType,
+      headline: `Admin ${verb} to league treasury · ${description}`,
+      detail: reversed_entry_id ? `Reverses entry ${String(reversed_entry_id).slice(0, 8)}` : null,
+    });
+
     return new Response(JSON.stringify({ entry_id: entry.id }), { headers: { ...cors, 'Content-Type': 'application/json' } });
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: cors });

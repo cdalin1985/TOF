@@ -154,7 +154,12 @@ serve(async (req) => {
     await sendPush(supabase, challenged_player_id, `${challengerPlayer?.full_name} challenged you!`, `${discipline} - Race to ${race_length}. Tap to respond.`, '/challenges');
 
     const { data: challengedPlayer } = await supabase.from('players').select('full_name').eq('id', challenged_player_id).single();
-    await supabase.from('activity_feed').insert({ event_type: 'challenge_issued', headline: `${challengerPlayer?.full_name} challenged ${challengedPlayer?.full_name} to ${discipline}!`, actor_player_id: challenger.id });
+    await supabase.from('activity_feed').insert({
+      event_type: 'challenge_issued',
+      headline: `${challengerPlayer?.full_name} challenged ${challengedPlayer?.full_name} to ${discipline}!`,
+      detail: `Race to ${race_length} · #${myPos} → #${theirPos} · responds within ${challengeExpiryDays} days`,
+      actor_player_id: challenger.id,
+    });
 
     return new Response(JSON.stringify({ challenge_id: challenge.id }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {

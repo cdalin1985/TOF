@@ -344,18 +344,19 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-2 mt-5 pt-4 border-t border-white/5">
+          <div className="grid grid-cols-5 gap-2 mt-5 pt-4 border-t border-white/5">
             {[
-              { label: 'Wins',   value: myStats?.wins ?? 0,           color: '#22C55E' },
-              { label: 'Losses', value: myStats?.losses ?? 0,         color: '#EF4444' },
-              { label: 'Win %',  value: `${winPct}%`,                 color: '#E8E2D6' },
-              { label: 'Streak', value: myStats?.current_streak ?? 0, color: (myStats?.current_streak ?? 0) > 0 ? '#22C55E' : '#9CA3AF' },
+              { label: 'Wins',      value: myStats?.wins ?? 0,           color: '#22C55E' },
+              { label: 'Losses',    value: myStats?.losses ?? 0,         color: '#EF4444' },
+              { label: 'Forfeits',  value: myStats?.forfeits ?? 0,       color: '#D4AF37' },
+              { label: 'Win %',     value: `${winPct}%`,                 color: '#E8E2D6' },
+              { label: 'Streak',    value: myStats?.current_streak ?? 0, color: (myStats?.current_streak ?? 0) > 0 ? '#22C55E' : '#9CA3AF' },
             ].map((s) => (
               <div key={s.label} className="text-center">
-                <div className="font-[Azeret_Mono] font-bold text-xl" style={{ color: s.color }}>
+                <div className="font-[Azeret_Mono] font-bold text-lg" style={{ color: s.color }}>
                   {s.value}
                 </div>
-                <div className="text-[#6B7280] text-xs font-[Barlow] mt-0.5">{s.label}</div>
+                <div className="text-[#6B7280] text-[10px] font-[Barlow] mt-0.5">{s.label}</div>
               </div>
             ))}
           </div>

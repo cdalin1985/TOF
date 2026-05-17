@@ -17,6 +17,60 @@ async function sendPush(supabase: any, playerId: string, title: string, body: st
   }
 }
 
+type PaymentMethod = 'cash_envelope' | 'paypal' | 'cash_app' | 'venmo';
+
+const PAYMENT_METHODS: PaymentMethod[] = ['cash_envelope', 'paypal', 'cash_app', 'venmo'];
+const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  cash_envelope: 'Cash envelope',
+  paypal: 'PayPal',
+  cash_app: 'Cash App',
+  venmo: 'Venmo',
+};
+
+const MATCH_FEE_CENTS = 500;
+
+type MatchFeePayer = {
+  player_id: string;
+  player_name: string;
+  payment_method: PaymentMethod;
+};
+
+async function recordMatchFeePayments(
+  supabase: ReturnType<typeof createClient>,
+  matchId: string,
+  actorProfileId: string,
+  payers: MatchFeePayer[],
+): Promise<void> {
+  if (payers.length === 0) return;
+
+  const shortMatch = matchId.slice(0, 8);
+  const rows = payers.map((payer) => ({
+    entry_type: 'credit',
+    amount_cents: 500,
+    description: `Match fee · ${payer.player_name} · ${PAYMENT_METHOD_LABELS[payer.payment_method]} · match ${shortMatch}`,
+    created_by: actorProfileId,
+    source_type: 'match_fee',
+    source_id: matchId,
+    player_id: payer.player_id,
+    metadata: {
+      match_id: matchId,
+      player_id: payer.player_id,
+      player_name: payer.player_name,
+      payment_method: payer.payment_method,
+      amount_cents: MATCH_FEE_CENTS,
+    },
+  }));
+
+  for (const row of rows) {
+    const { error } = await supabase.from('treasury_ledger').insert(row);
+    if (!error) continue;
+    // 23505 = unique_violation (idempotent retry); anything else is a real failure.
+    if ((error as { code?: string }).code !== '23505') {
+      throw error;
+    }
+  }
+}
+
 async function createPostLossCooldown(supabase: ReturnType<typeof createClient>, loserId: string): Promise<void> {
   const { data: settings } = await supabase.from('league_settings').select('cooldown_hours').single();
   const cooldownHours = settings?.cooldown_hours ?? 24;
@@ -141,7 +195,7 @@ serve(async (req) => {
     if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: cors });
 
     const { match_id, winner_id, final_score_player1, final_score_player2, payment_method } = await req.json();
-    if (payment_method && !['envelope', 'digital'].includes(payment_method)) return new Response(JSON.stringify({ error: 'Invalid payment method.' }), { headers: cors });
+    if (payment_method && !PAYMENT_METHODS.includes(payment_method)) return new Response(JSON.stringify({ error: 'Invalid payment method.' }), { headers: cors });
     if (!Number.isInteger(final_score_player1) || !Number.isInteger(final_score_player2) || final_score_player1 < 0 || final_score_player2 < 0) return new Response(JSON.stringify({ error: 'Scores must be non-negative whole numbers.' }), { headers: cors });
 
     const { data: match } = await supabase.from('matches').select('*').eq('id', match_id).single();
@@ -177,6 +231,41 @@ serve(async (req) => {
       if (!claimed?.length) return new Response(JSON.stringify({ success: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });
       const loser_id = winner_id === match.player1_id ? match.player2_id : match.player1_id;
       await confirmResult(supabase, match_id, winner_id, loser_id, final_score_player1, final_score_player2, match);
+
+      const { data: finalMatch } = await supabase.from('matches').select('*').eq('id', match_id).single();
+      if (finalMatch) {
+        const [{ data: p1Player }, { data: p2Player }] = await Promise.all([
+          supabase.from('players').select('full_name').eq('id', finalMatch.player1_id).single(),
+          supabase.from('players').select('full_name').eq('id', finalMatch.player2_id).single(),
+        ]);
+
+        const payers: MatchFeePayer[] = [];
+        if (finalMatch.player1_payment_method && PAYMENT_METHODS.includes(finalMatch.player1_payment_method)) {
+          payers.push({
+            player_id: finalMatch.player1_id,
+            player_name: p1Player?.full_name ?? 'Player 1',
+            payment_method: finalMatch.player1_payment_method as PaymentMethod,
+          });
+        }
+        if (finalMatch.player2_payment_method && PAYMENT_METHODS.includes(finalMatch.player2_payment_method)) {
+          payers.push({
+            player_id: finalMatch.player2_id,
+            player_name: p2Player?.full_name ?? 'Player 2',
+            payment_method: finalMatch.player2_payment_method as PaymentMethod,
+          });
+        }
+        if (payers.length > 0) {
+          await recordMatchFeePayments(supabase, match_id, user.id, payers);
+          for (const payer of payers) {
+            await supabase.from('activity_feed').insert({
+              event_type: 'match_fee_recorded',
+              headline: `${payer.player_name} paid the $5 match fee · ${PAYMENT_METHOD_LABELS[payer.payment_method]}`,
+              detail: `Match ${match_id.slice(0, 8)} · credited to league treasury`,
+              actor_player_id: payer.player_id,
+            });
+          }
+        }
+      }
     } else {
       const otherId = isP1 ? match.player2_id : match.player1_id;
       const { data: callerPlayer } = await supabase.from('players').select('full_name').eq('id', caller.id).single();

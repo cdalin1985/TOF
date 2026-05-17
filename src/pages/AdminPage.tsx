@@ -11,7 +11,8 @@ import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { formatDistanceToNow, formatDate } from '../utils/time';
-import type { Match, Player, TreasuryEntry, AuditEvent, LeagueSettings, Challenge } from '../types/database';
+import type { Match, Player, AuditEvent, LeagueSettings, Challenge } from '../types/database';
+import { fetchTreasurySnapshot, formatCents, ledgerSignFor } from '../lib/treasury';
 
 type TabKey = 'disputes' | 'challenges' | 'matches' | 'rankings' | 'players' | 'treasury' | 'rank1' | 'settings' | 'audit';
 type ChallengeRow = Challenge & { match_id: string | null };
@@ -194,7 +195,7 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
       const { data: chals } = await supabase
         .from('challenges')
         .select('*')
-        .in('status', ['pending', 'accepted', 'scheduled', 'in_progress'])
+        .in('status', ['pending', 'accepted', 'scheduled', 'in_progress', 'forfeited'])
         .order('created_at', { ascending: false });
       if (!chals?.length) return [];
       const { data: matches } = await supabase
@@ -208,6 +209,18 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     },
   });
 
+  const { data: forfeitEvents = [] } = useQuery<{ challenge_id: string }[]>({
+    queryKey: ['admin-active-forfeiture-events'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('challenge_forfeiture_events')
+        .select('challenge_id')
+        .is('reversed_at', null);
+      return data ?? [];
+    },
+  });
+  const activeForfeitChallengeIds = new Set(forfeitEvents.map((e) => e.challenge_id));
+
   const { data: players = [] } = useQuery<Pick<Player, 'id' | 'full_name'>[]>({
     queryKey: ['players-lookup'],
     queryFn: async () => {
@@ -219,11 +232,36 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const getName = (id: string) => players.find((p) => p.id === id)?.full_name ?? id.slice(0, 8) + '…';
 
   const [actioning, setActioning]   = useState<string | null>(null);
-  const [actionType, setActionType] = useState<'cancel' | 'forfeit' | null>(null);
+  const [actionType, setActionType] = useState<'cancel' | 'forfeit' | 'reverse_decline' | null>(null);
   const [winnerId, setWinnerId]     = useState('');
   const [loading, setLoading]       = useState(false);
+  const [reverseError, setReverseError] = useState('');
 
-  const resetAction = () => { setActioning(null); setActionType(null); setWinnerId(''); };
+  const resetAction = () => { setActioning(null); setActionType(null); setWinnerId(''); setReverseError(''); };
+
+  const handleReverseDecline = async (c: ChallengeRow) => {
+    setLoading(true);
+    setReverseError('');
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setLoading(false); setReverseError('Session expired — please log in again.'); return; }
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/respond-to-challenge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ challenge_id: c.id, action: 'reverse_decline' }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setLoading(false);
+    if (!res.ok || json.error) {
+      setReverseError(json.error ?? 'Could not reverse this decline.');
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ['admin-active-challenges'] });
+    qc.invalidateQueries({ queryKey: ['admin-active-forfeiture-events'] });
+    qc.invalidateQueries({ queryKey: ['rankings'] });
+    qc.invalidateQueries({ queryKey: ['challenges'] });
+    qc.invalidateQueries({ queryKey: ['activity-feed-full'] });
+    resetAction();
+  };
 
   const handleCancel = async (c: ChallengeRow) => {
     setLoading(true);
@@ -251,7 +289,7 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   };
 
   const STATUS_BADGE: Record<string, string> = {
-    pending: 'pending', accepted: 'win', scheduled: 'info', in_progress: 'loss',
+    pending: 'pending', accepted: 'win', scheduled: 'info', in_progress: 'loss', forfeited: 'loss',
   };
 
   if (challenges.length === 0) {
@@ -280,44 +318,82 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
             {c.discipline} · Race to {c.race_length} · Expires {formatDistanceToNow(c.expires_at)}
           </div>
 
-          {actioning === c.id ? (
-            <div className="space-y-3">
-              {actionType === 'forfeit' && (
-                c.match_id ? (
-                  <>
-                    <p className="text-[#9CA3AF] text-xs font-[Barlow]">Select winner:</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[{ id: c.challenger_id, name: getName(c.challenger_id) }, { id: c.challenged_id, name: getName(c.challenged_id) }].map((p) => (
-                        <button key={p.id} onClick={() => setWinnerId(p.id)}
-                          className={`py-2 rounded-xl border text-sm font-[Barlow] transition-all ${winnerId === p.id ? 'border-[#22C55E] bg-[#22C55E]/10 text-[#22C55E]' : 'border-[#333] bg-[#252525]/50 text-[#E8E2D6]'}`}>
-                          {p.name}
-                        </button>
-                      ))}
+          {(() => {
+            const declineForfeit = c.status === 'forfeited' && activeForfeitChallengeIds.has(c.id);
+
+            if (actioning === c.id) {
+              if (actionType === 'reverse_decline') {
+                return (
+                  <div className="space-y-3">
+                    <p className="text-[#9CA3AF] text-xs font-[Barlow]">
+                      Reverse the decline. The challenge returns to pending only if the rankings, stats,
+                      cooldown, and challenge row have not been touched since the forfeit.
+                    </p>
+                    {reverseError && <p className="text-[#EF4444] text-xs font-[Barlow]">{reverseError}</p>}
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="sm" onClick={resetAction}>Back</Button>
+                      <Button variant="primary" size="sm" loading={loading} onClick={() => handleReverseDecline(c)}>
+                        Reverse Decline
+                      </Button>
                     </div>
-                  </>
-                ) : (
-                  <p className="text-[#F59E0B] text-xs font-[Barlow]">No match started — this will cancel the challenge only.</p>
-                )
-              )}
+                  </div>
+                );
+              }
+              return (
+                <div className="space-y-3">
+                  {actionType === 'forfeit' && (
+                    c.match_id ? (
+                      <>
+                        <p className="text-[#9CA3AF] text-xs font-[Barlow]">Select winner:</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[{ id: c.challenger_id, name: getName(c.challenger_id) }, { id: c.challenged_id, name: getName(c.challenged_id) }].map((p) => (
+                            <button key={p.id} onClick={() => setWinnerId(p.id)}
+                              className={`py-2 rounded-xl border text-sm font-[Barlow] transition-all ${winnerId === p.id ? 'border-[#22C55E] bg-[#22C55E]/10 text-[#22C55E]' : 'border-[#333] bg-[#252525]/50 text-[#E8E2D6]'}`}>
+                              {p.name}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-[#F59E0B] text-xs font-[Barlow]">No match started — this will cancel the challenge only.</p>
+                    )
+                  )}
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" onClick={resetAction}>Back</Button>
+                    <Button
+                      variant="danger" size="sm" loading={loading}
+                      disabled={actionType === 'forfeit' && !!c.match_id && !winnerId}
+                      onClick={() => actionType === 'cancel' ? handleCancel(c) : (c.match_id ? handleForfeit(c) : handleCancel(c))}
+                    >
+                      Confirm
+                    </Button>
+                  </div>
+                </div>
+              );
+            }
+
+            if (declineForfeit) {
+              return (
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary" size="sm"
+                    onClick={() => { setActioning(c.id); setActionType('reverse_decline'); setReverseError(''); }}
+                  >
+                    Reverse Decline
+                  </Button>
+                </div>
+              );
+            }
+
+            return (
               <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={resetAction}>Back</Button>
-                <Button
-                  variant="danger" size="sm" loading={loading}
-                  disabled={actionType === 'forfeit' && !!c.match_id && !winnerId}
-                  onClick={() => actionType === 'cancel' ? handleCancel(c) : (c.match_id ? handleForfeit(c) : handleCancel(c))}
-                >
-                  Confirm
+                <Button variant="ghost" size="sm" onClick={() => { setActioning(c.id); setActionType('cancel'); }}>Cancel</Button>
+                <Button variant="danger" size="sm" onClick={() => { setActioning(c.id); setActionType('forfeit'); setWinnerId(''); }}>
+                  {c.match_id ? 'Force Forfeit' : 'Force Cancel'}
                 </Button>
               </div>
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              <Button variant="ghost" size="sm" onClick={() => { setActioning(c.id); setActionType('cancel'); }}>Cancel</Button>
-              <Button variant="danger" size="sm" onClick={() => { setActioning(c.id); setActionType('forfeit'); setWinnerId(''); }}>
-                {c.match_id ? 'Force Forfeit' : 'Force Cancel'}
-              </Button>
-            </div>
-          )}
+            );
+          })()}
         </GlassCard>
       ))}
     </div>
@@ -737,38 +813,43 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
 // ─── Treasury ────────────────────────────────────────────────────────────────
 
 function TreasuryTab() {
+  const qc = useQueryClient();
   const [entryType, setEntryType] = useState<'credit' | 'debit'>('credit');
   const [amount, setAmount]       = useState('');
   const [desc, setDesc]           = useState('');
   const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState('');
 
-  const { data: entries = [] } = useQuery<TreasuryEntry[]>({
+  const { data } = useQuery({
     queryKey: ['treasury'],
-    queryFn: async () => {
-      const { data } = await supabase.from('treasury_ledger').select('*').order('created_at', { ascending: false }).limit(20);
-      return data ?? [];
-    },
+    queryFn: () => fetchTreasurySnapshot(),
   });
 
-  const balance = entries.reduce((sum, e) => {
-    if (e.entry_type === 'credit') return sum + e.amount_cents;
-    if (e.entry_type === 'debit')  return sum - e.amount_cents;
-    return sum;
-  }, 0);
+  const summary = data?.summary;
+  const entries = data?.entries ?? [];
+  const balance = summary?.balance_cents ?? 0;
 
   const handleAdd = async () => {
     if (!amount || !desc) return;
     setLoading(true);
+    setError('');
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setLoading(false); return; }
-    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-treasury`, {
+    if (!session) { setLoading(false); setError('Session expired — please log in again.'); return; }
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-treasury`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({ entry_type: entryType, amount_cents: Math.round(parseFloat(amount) * 100), description: desc }),
     });
+    const json = await res.json().catch(() => ({}));
     setLoading(false);
+    if (!res.ok || json.error) {
+      setError(json.error ?? 'Could not save treasury entry.');
+      return;
+    }
     setAmount('');
     setDesc('');
+    qc.invalidateQueries({ queryKey: ['treasury'] });
+    qc.invalidateQueries({ queryKey: ['audit-events'] });
   };
 
   return (
@@ -776,9 +857,12 @@ function TreasuryTab() {
       <GlassCard className="p-5 text-center">
         <div className="text-[#9CA3AF] text-sm font-[Barlow] mb-1">Current Balance</div>
         <div className="font-[Azeret_Mono] font-bold text-5xl" style={{ color: balance >= 0 ? '#22C55E' : '#EF4444' }}>
-          ${(Math.abs(balance) / 100).toFixed(2)}
+          {formatCents(Math.abs(balance))}
         </div>
         {balance < 0 && <div className="text-[#EF4444] text-xs font-[Barlow] mt-1">In deficit</div>}
+        <div className="text-[#6B7280] text-xs font-[Barlow] mt-2">
+          {formatCents(summary?.total_credit_cents ?? 0)} in · {formatCents(summary?.total_debit_cents ?? 0)} out · {summary?.entry_count ?? 0} entries
+        </div>
       </GlassCard>
 
       <GlassCard className="p-4">
@@ -796,22 +880,31 @@ function TreasuryTab() {
             className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]" />
           <input placeholder="Description" value={desc} onChange={(e) => setDesc(e.target.value)}
             className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]" />
+          {error && <p className="text-[#EF4444] text-xs font-[Barlow]">{error}</p>}
           <Button variant="primary" fullWidth loading={loading} onClick={handleAdd} disabled={!amount || !desc}>Add Entry</Button>
         </div>
       </GlassCard>
 
       <div className="space-y-2">
-        {entries.map((e) => (
-          <GlassCard key={e.id} className="p-3 flex items-center justify-between">
-            <div>
-              <div className="font-[Barlow] text-sm text-[#E8E2D6]">{e.description}</div>
-              <div className="text-[#6B7280] text-xs font-[Barlow]">{formatDate(e.created_at)}</div>
-            </div>
-            <div className={`font-[Azeret_Mono] font-bold ${e.entry_type === 'credit' ? 'text-[#22C55E]' : 'text-[#EF4444]'}`}>
-              {e.entry_type === 'credit' ? '+' : '-'}${(e.amount_cents / 100).toFixed(2)}
-            </div>
-          </GlassCard>
-        ))}
+        {entries.map((entry) => {
+          const sign = ledgerSignFor(entry.effect_cents);
+          const color = entry.effect_cents > 0
+            ? '#22C55E'
+            : entry.effect_cents < 0
+              ? '#EF4444'
+              : '#9CA3AF';
+          return (
+            <GlassCard key={entry.id} className="p-3 flex items-center justify-between">
+              <div className="min-w-0">
+                <div className="font-[Barlow] text-sm text-[#E8E2D6] truncate">{entry.description}</div>
+                <div className="text-[#6B7280] text-xs font-[Barlow]">{formatDate(entry.created_at)}</div>
+              </div>
+              <div className="font-[Azeret_Mono] font-bold shrink-0" style={{ color }}>
+                {sign}{formatCents(Math.abs(entry.effect_cents))}
+              </div>
+            </GlassCard>
+          );
+        })}
       </div>
     </div>
   );

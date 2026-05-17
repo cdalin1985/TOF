@@ -89,8 +89,11 @@ function RankCard({
               {rp.metrics?.fargo_rating ? ' FR' : ''}
             </span>
             {rp.stats && (
-              <span className="text-[#6B7280] text-xs font-[Azeret_Mono]">
-                {rp.stats.wins}W–{rp.stats.losses}L
+              <span
+                className="text-[#6B7280] text-xs font-[Azeret_Mono]"
+                title="Wins · Losses · Forfeits"
+              >
+                {rp.stats.wins}-{rp.stats.losses}-{rp.stats.forfeits}
               </span>
             )}
             {rankChange !== 0 && (

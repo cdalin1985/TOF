@@ -74,10 +74,15 @@ function RespondModal({
     onSuccess();
   };
 
+  const [showDeclineConfirm, setShowDeclineConfirm] = useState(false);
+
   const handleDecline = async () => {
     setLoading(true);
-    await callFn({ challenge_id: challenge.id, action: 'decline' });
+    setError('');
+    const json = await callFn({ challenge_id: challenge.id, action: 'decline' });
     setLoading(false);
+    if (json.error) { setError(json.error); return; }
+    setShowDeclineConfirm(false);
     onSuccess();
   };
 
@@ -149,14 +154,36 @@ function RespondModal({
 
         {error && <p className="text-[#EF4444] text-xs font-[Barlow] mb-3">{error}</p>}
 
-        <div className="flex gap-2 mb-2">
-          <Button variant="danger" fullWidth onClick={handleDecline} loading={loading}>
-            Decline
-          </Button>
-          <Button variant="success" fullWidth onClick={handleAccept} loading={loading}>
-            Accept ✓
-          </Button>
-        </div>
+        {showDeclineConfirm ? (
+          <div className="space-y-3 mb-2 p-3 rounded-xl border border-[#EF4444]/40 bg-[#EF4444]/5">
+            <div className="text-sm font-[Barlow] font-semibold text-[#E8E2D6]">
+              Decline counts as a forfeit
+            </div>
+            <ul className="text-xs font-[Barlow] text-[#9CA3AF] space-y-1 list-disc list-inside">
+              <li>The challenger gets a win by forfeit and may take your spot if they are lower ranked.</li>
+              <li>You get a forfeit on your record and a post-match cooldown.</li>
+              <li>No match fee is owed.</li>
+              <li>An admin can reverse this only if your rankings and stats have not changed yet.</li>
+            </ul>
+            <div className="flex gap-2 pt-1">
+              <Button variant="ghost" fullWidth size="sm" onClick={() => setShowDeclineConfirm(false)} disabled={loading}>
+                Keep pending
+              </Button>
+              <Button variant="danger" fullWidth size="sm" onClick={handleDecline} loading={loading}>
+                Decline anyway
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-2 mb-2">
+            <Button variant="danger" fullWidth onClick={() => setShowDeclineConfirm(true)} disabled={loading}>
+              Decline (forfeit)
+            </Button>
+            <Button variant="success" fullWidth onClick={handleAccept} loading={loading}>
+              Accept ✓
+            </Button>
+          </div>
+        )}
         <Button variant="ghost" fullWidth size="sm" onClick={handleWash} loading={loading}>
           We couldn't agree on a time
         </Button>

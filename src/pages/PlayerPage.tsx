@@ -149,15 +149,21 @@ export default function PlayerPage() {
       {/* Overall stats */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06, duration: 0.35 }}>
         <GlassCard className="p-4 mb-4">
-          <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-3">Overall</h2>
+          <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-1">Overall</h2>
+          <div className="text-[#6B7280] text-xs font-[Barlow] mb-3" title="Wins · Losses · Forfeits">
+            Record W-L-F:{' '}
+            <span className="text-[#E8E2D6] font-[Azeret_Mono]">
+              {stats?.wins ?? 0}-{stats?.losses ?? 0}-{stats?.forfeits ?? 0}
+            </span>
+          </div>
           <div className="grid grid-cols-3 gap-3">
             {[
               { label: 'Wins',         value: stats?.wins ?? 0,             color: '#22C55E' },
               { label: 'Losses',       value: stats?.losses ?? 0,           color: '#EF4444' },
+              { label: 'Forfeits',     value: stats?.forfeits ?? 0,         color: '#D4AF37' },
               { label: 'Win %',        value: `${overallWinPct}%`,          color: '#E8E2D6' },
               { label: 'Streak',       value: stats?.current_streak ?? 0,   color: (stats?.current_streak ?? 0) > 0 ? '#22C55E' : '#9CA3AF' },
               { label: 'Best Streak',  value: stats?.best_streak ?? 0,      color: '#9CA3AF' },
-              { label: 'Matches',      value: totalMatches,                  color: '#9CA3AF' },
             ].map((s) => (
               <div key={s.label} className="text-center bg-[#252525]/60 rounded-xl p-3">
                 <div className="font-[Azeret_Mono] font-bold text-2xl" style={{ color: s.color }}>{s.value}</div>
@@ -205,13 +211,13 @@ export default function PlayerPage() {
               {[
                 { label: 'Wins',          value: ds.wins,                    color: '#22C55E' },
                 { label: 'Losses',        value: ds.losses,                  color: '#EF4444' },
+                { label: 'Forfeits',      value: ds.forfeits,                color: '#D4AF37' },
                 { label: 'Win %',         value: `${dsWinPct}%`,             color: '#E8E2D6' },
                 { label: 'Streak',        value: ds.current_streak,          color: ds.current_streak > 0 ? '#22C55E' : '#9CA3AF' },
                 { label: 'Best Streak',   value: ds.best_streak,             color: '#9CA3AF' },
                 { label: 'Avg Race',      value: dsAvgRace,                  color: '#9CA3AF' },
                 { label: 'Challenger W',  value: ds.challenger_wins,         color: '#22C55E' },
-                { label: 'Defender W',    value: ds.defender_wins,           color: '#22C55E' },
-                { label: 'Matches',       value: ds.matches_played,          color: '#9CA3AF' },
+                { label: 'Forfeit W',     value: ds.forfeit_wins,            color: '#D4AF37' },
               ].map((s) => (
                 <div key={s.label} className="text-center bg-[#252525]/60 rounded-xl p-3">
                   <div className="font-[Azeret_Mono] font-bold text-2xl" style={{ color: s.color }}>{s.value}</div>
