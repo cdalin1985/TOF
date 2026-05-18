@@ -12,6 +12,7 @@ function read(path) {
 const migration = read('supabase/migrations/013_release_readiness.sql');
 const submitResult = read('supabase/functions/submit-result/index.ts');
 const respondToChallenge = read('supabase/functions/respond-to-challenge/index.ts');
+const resolveDispute = read('supabase/functions/resolve-dispute/index.ts');
 const databaseTypes = read('src/types/database.ts');
 const matchPage = read('src/pages/MatchPage.tsx');
 
@@ -60,4 +61,8 @@ test('match scoreboard exposes large tap targets and undo last point', () => {
   assert.match(matchPage, /Undo last point/);
   assert.match(matchPage, /aria-label=.*Add point/i);
   assert.match(matchPage, /lastScoreAction/);
+});
+
+test('admin dispute resolution does not write retired season points column', () => {
+  assert.doesNotMatch(resolveDispute, /points\s*:/);
 });

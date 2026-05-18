@@ -76,11 +76,20 @@ serve(async (req) => {
       supabase.from('rankings').select('position').eq('player_id', winner_id).single(),
       supabase.from('rankings').select('position').eq('player_id', loser_id).single(),
     ]);
+    let winnerCurrentPosition = winnerRank.data?.position ?? null;
     if (winnerRank.data && loserRank.data && winnerRank.data.position > loserRank.data.position) {
-      await supabase.rpc('cascade_ranking_after_win', {
+      const { error: cascadeError } = await supabase.rpc('cascade_ranking_after_win', {
         p_winner_id: winner_id,
         p_loser_id: loser_id,
       });
+      if (cascadeError) throw cascadeError;
+
+      const { data: refreshedWinnerRank } = await supabase
+        .from('rankings')
+        .select('position')
+        .eq('player_id', winner_id)
+        .single();
+      winnerCurrentPosition = refreshedWinnerRank?.position ?? winnerCurrentPosition;
     }
 
     // Update stats
@@ -88,14 +97,61 @@ serve(async (req) => {
       supabase.from('player_season_stats').select('*').eq('player_id', winner_id).single(),
       supabase.from('player_season_stats').select('*').eq('player_id', loser_id).single(),
     ]);
+    const winnerIsChallenger = match.player1_id === winner_id;
     if (ws.data) {
       const s = ws.data;
       const streak = s.current_streak >= 0 ? s.current_streak + 1 : 1;
-      await supabase.from('player_season_stats').update({ wins: s.wins + 1, matches_played: s.matches_played + 1, points: s.points + 3, current_streak: streak, best_streak: Math.max(s.best_streak, streak) }).eq('player_id', winner_id);
+      const bestRank = winnerCurrentPosition !== null
+        ? (s.best_rank_achieved === null || winnerCurrentPosition < s.best_rank_achieved ? winnerCurrentPosition : s.best_rank_achieved)
+        : s.best_rank_achieved;
+      const { error: winnerStatsError } = await supabase.from('player_season_stats').update({
+        wins: s.wins + 1,
+        matches_played: s.matches_played + 1,
+        current_streak: streak,
+        best_streak: Math.max(s.best_streak, streak),
+        challenger_wins: winnerIsChallenger ? s.challenger_wins + 1 : s.challenger_wins,
+        defender_wins: !winnerIsChallenger ? s.defender_wins + 1 : s.defender_wins,
+        best_rank_achieved: bestRank,
+      }).eq('player_id', winner_id);
+      if (winnerStatsError) throw winnerStatsError;
     }
     if (ls.data) {
       const s = ls.data;
-      await supabase.from('player_season_stats').update({ losses: s.losses + 1, matches_played: s.matches_played + 1, points: s.points + 1, current_streak: -1 }).eq('player_id', loser_id);
+      const { error: loserStatsError } = await supabase.from('player_season_stats').update({
+        losses: s.losses + 1,
+        matches_played: s.matches_played + 1,
+        current_streak: 0,
+      }).eq('player_id', loser_id);
+      if (loserStatsError) throw loserStatsError;
+    }
+
+    await Promise.all([
+      supabase.from('player_discipline_stats').upsert({ player_id: winner_id, discipline: match.discipline }, { onConflict: 'player_id,discipline', ignoreDuplicates: true }),
+      supabase.from('player_discipline_stats').upsert({ player_id: loser_id, discipline: match.discipline }, { onConflict: 'player_id,discipline', ignoreDuplicates: true }),
+    ]);
+
+    for (const [pid, isWinner, isChallenger] of [[winner_id, true, winnerIsChallenger], [loser_id, false, !winnerIsChallenger]] as [string, boolean, boolean][]) {
+      const { data: ds } = await supabase
+        .from('player_discipline_stats')
+        .select('*')
+        .eq('player_id', pid)
+        .eq('discipline', match.discipline)
+        .single();
+      if (!ds) continue;
+
+      const newStreak = isWinner ? (ds.current_streak >= 0 ? ds.current_streak + 1 : 1) : 0;
+      const { error: disciplineStatsError } = await supabase.from('player_discipline_stats').update({
+        matches_played: ds.matches_played + 1,
+        wins: isWinner ? ds.wins + 1 : ds.wins,
+        losses: isWinner ? ds.losses : ds.losses + 1,
+        current_streak: newStreak,
+        best_streak: isWinner ? Math.max(ds.best_streak, newStreak) : ds.best_streak,
+        challenger_wins: isWinner && isChallenger ? ds.challenger_wins + 1 : ds.challenger_wins,
+        defender_wins: isWinner && !isChallenger ? ds.defender_wins + 1 : ds.defender_wins,
+        total_race_length: ds.total_race_length + match.race_length,
+        updated_at: new Date().toISOString(),
+      }).eq('player_id', pid).eq('discipline', match.discipline);
+      if (disciplineStatsError) throw disciplineStatsError;
     }
 
     // Audit log
