@@ -10,6 +10,7 @@ import { BottomNav } from './BottomNav';
 import { LoadingScreen } from './LoadingScreen';
 import { OfflineBanner } from './OfflineBanner';
 import { PWAInstallBanner } from './PWAInstallBanner';
+import { AdminThemeSwitcher } from './admin/AdminThemeSwitcher';
 import { useQuery } from '@tanstack/react-query';
 
 // Screens that show bottom nav
@@ -144,7 +145,7 @@ export const Layout: React.FC = () => {
   const showNav = showsNav(location.pathname) && !!session && !!player;
 
   return (
-    <div className="relative min-h-screen bg-[#0D0D0D] overflow-hidden">
+    <div className="relative min-h-screen bg-[var(--toc-theme-bg,#0D0D0D)] overflow-hidden">
       <LoadingScreen visible={!appReady} />
       <PWAInstallBanner />
       <AmbientBackground />
@@ -168,6 +169,7 @@ export const Layout: React.FC = () => {
             transition={{ duration: 0.25, ease: 'easeOut' }}
             className="min-h-full"
           >
+            <AdminThemeSwitcher />
             <Outlet />
           </motion.div>
         </AnimatePresence>
