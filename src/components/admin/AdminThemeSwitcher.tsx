@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../stores/authStore';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -25,6 +26,7 @@ const OPTIONS: Array<{
 ];
 
 export function AdminThemeSwitcher() {
+  const location = useLocation();
   const { profile } = useAuthStore();
   const {
     theme,
@@ -39,6 +41,7 @@ export function AdminThemeSwitcher() {
   const [message, setMessage] = useState('');
 
   const canManage = profile?.role === 'admin' || profile?.role === 'super_admin';
+  const isAdminPage = location.pathname === '/admin';
 
   const statusText = useMemo(() => {
     if (message) return message;
@@ -46,7 +49,7 @@ export function AdminThemeSwitcher() {
     return `Global theme is ${globalTheme}.`;
   }, [globalTheme, message, previewTheme]);
 
-  if (!canManage) return null;
+  if (!canManage || !isAdminPage) return null;
 
   async function applyGlobally(nextTheme: TocTheme) {
     setSaving(true);
@@ -81,7 +84,7 @@ export function AdminThemeSwitcher() {
   }
 
   return (
-    <section className="glass-card toc-theme-admin-panel">
+    <section className="glass-card toc-theme-admin-panel mx-4 mt-3">
       <div className="toc-theme-admin-panel__header">
         <div>
           <div className="toc-theme-admin-panel__title">Visual Theme</div>
