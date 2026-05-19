@@ -1,3 +1,7 @@
+-- Recovered from Supabase migration history (version 20260517035337).
+-- Source: supabase_migrations.schema_migrations
+-- Name: serialize_ranking_mutations
+
 -- ============================================================
 -- TOC App - Migration 012: Serialize Ranking Mutations
 -- ============================================================

@@ -1,3 +1,7 @@
+-- Recovered from Supabase migration history (version 20260517035030).
+-- Source: supabase_migrations.schema_migrations
+-- Name: lock_down_security_definer_rpc
+
 -- ============================================================
 -- TOC App - Migration 011: Lock Down Security Definer RPC
 -- ============================================================

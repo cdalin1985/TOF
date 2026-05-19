@@ -1,6 +1,7 @@
--- ============================================================
--- TOC App — Migration 002: Seed Data (70 Players)
--- ============================================================
+-- Recovered from Supabase migration history (version 20260321032616).
+-- Source: supabase_migrations.schema_migrations
+-- Name: toc_seed_data
+
 
 INSERT INTO players (id, full_name) VALUES
   ('a0000001-0000-0000-0000-000000000001', 'Dan Hamper'),
@@ -75,13 +76,11 @@ INSERT INTO players (id, full_name) VALUES
   ('a0000001-0000-0000-0000-000000000070', 'Kelly Smail')
 ON CONFLICT (id) DO NOTHING;
 
--- Initial rankings (position = insertion order)
 INSERT INTO rankings (player_id, position)
 SELECT id, ROW_NUMBER() OVER (ORDER BY created_at) AS position
 FROM players
 ON CONFLICT (player_id) DO NOTHING;
 
--- Fargo ratings
 INSERT INTO player_reference_metrics (player_id, fargo_rating, fargo_robustness)
 SELECT id,
   CASE full_name
@@ -130,7 +129,6 @@ SELECT id,
 FROM players
 ON CONFLICT (player_id) DO NOTHING;
 
--- Initialize season stats for all players
 INSERT INTO player_season_stats (player_id)
 SELECT id FROM players
 ON CONFLICT (player_id) DO NOTHING;

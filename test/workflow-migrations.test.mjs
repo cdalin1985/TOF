@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 const migration = readFileSync(
-  join(process.cwd(), 'supabase', 'migrations', '010_workflow_connection_fixes.sql'),
+  join(process.cwd(), 'supabase', 'migrations', '20260517034450_workflow_connection_fixes.sql'),
   'utf8',
 );
 const createChallengeFunction = readFileSync(
@@ -12,11 +12,11 @@ const createChallengeFunction = readFileSync(
   'utf8',
 );
 const securityMigration = readFileSync(
-  join(process.cwd(), 'supabase', 'migrations', '011_lock_down_security_definer_rpc.sql'),
+  join(process.cwd(), 'supabase', 'migrations', '20260517035030_lock_down_security_definer_rpc.sql'),
   'utf8',
 );
 const rankLockMigration = readFileSync(
-  join(process.cwd(), 'supabase', 'migrations', '012_serialize_ranking_mutations.sql'),
+  join(process.cwd(), 'supabase', 'migrations', '20260517035337_serialize_ranking_mutations.sql'),
   'utf8',
 );
 
@@ -33,9 +33,13 @@ test('migration makes max_race nullable so null means no race maximum', () => {
 test('migration installs safe rank movement functions and cron wiring', () => {
   assert.match(migration, /CREATE OR REPLACE FUNCTION public\.cascade_ranking_after_win/i);
   assert.match(migration, /CREATE OR REPLACE FUNCTION public\.apply_rank1_penalty\(p_player_id uuid\)\s+RETURNS integer/i);
-  assert.match(migration, /LOCK TABLE public\.rankings IN SHARE ROW EXCLUSIVE MODE/i);
+  // The original 010 cascade uses the weaker ROW EXCLUSIVE lock and the
+  // 1000/999 offset pair. The stronger SHARE ROW EXCLUSIVE upgrade and the
+  // 1000/1001 offset pair both land later in migration 012; see the
+  // "ranking lock migration serializes concurrent rank mutators" test below.
+  assert.match(migration, /LOCK TABLE public\.rankings IN ROW EXCLUSIVE MODE/i);
   assert.match(migration, /position = position \+ 1000/i);
-  assert.match(migration, /position = position - 1001/i);
+  assert.match(migration, /position = position - 999/i);
   assert.match(migration, /SELECT public\.enforce_rank1_obligations\(\);/i);
 });
 
@@ -71,6 +75,8 @@ test('security migration revokes explicit anon and authenticated RPC access', ()
 test('ranking lock migration serializes concurrent rank mutators', () => {
   assert.match(rankLockMigration, /CREATE OR REPLACE FUNCTION public\.cascade_ranking_after_win/i);
   assert.match(rankLockMigration, /CREATE OR REPLACE FUNCTION public\.apply_rank1_penalty/i);
+  // 012 upgrades 010's ROW EXCLUSIVE lock to the stronger SHARE ROW EXCLUSIVE
+  // and bumps the cascade offset from -999 back to -1001.
   assert.match(rankLockMigration, /LOCK TABLE public\.rankings IN SHARE ROW EXCLUSIVE MODE/i);
-  assert.doesNotMatch(rankLockMigration, /IN ROW EXCLUSIVE MODE/i);
+  assert.match(rankLockMigration, /position = position - 1001/i);
 });

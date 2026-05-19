@@ -12,23 +12,31 @@ This guide points at the Supabase project, GitHub repo, and Vercel app that are 
 
 Think of the project ref like the street address for the database. If the app points at the wrong address, the right code can still update the wrong database.
 
-## Step 1: Run SQL Migrations in Supabase
+## Step 1: Apply Database Migrations
 
-Go to: https://supabase.com/dashboard/project/ankvjywsnydpkepdvuvm/sql/new
+Migrations live in `supabase/migrations/` as timestamp-named files. They are the same migrations Supabase has applied to production — what is tracked in `supabase_migrations.schema_migrations` matches what is in this directory.
 
-Run every migration in number order:
+### For a fresh setup (new Supabase project)
 
-1. `supabase/migrations/001_schema.sql`
-2. `supabase/migrations/002_seed.sql`
-3. `supabase/migrations/003_rls.sql`
-4. `supabase/migrations/004_rule_changes.sql`
-5. `supabase/migrations/005_push_subscriptions.sql`
-6. `supabase/migrations/006_profile_customization.sql`
-7. `supabase/migrations/007_storage_avatars.sql`
-8. `supabase/migrations/008_expire_stale_challenges.sql`
-9. `supabase/migrations/009_rank1_obligation_cron.sql`
+Apply every migration in timestamp order using the Supabase CLI:
 
-If you already ran migrations 001–008 before, run only the missing migrations. The Rank #1 cron migration is safe to run again because it replaces the cron job with the same job name instead of creating duplicates.
+```bash
+export SUPABASE_ACCESS_TOKEN=your_temporary_token_here
+npx supabase link --project-ref <your-new-project-ref>
+npx supabase db push
+```
+
+`db push` reads every `.sql` file in `supabase/migrations/`, sorts by filename (timestamp order), and applies any that the project does not already have in its tracker. Safe to re-run.
+
+### For the existing `toc1` production project (`ankvjywsnydpkepdvuvm`)
+
+All current migrations are already applied. New migrations land via PRs and either:
+- merge to `main` and you run `npx supabase db push` once linked, or
+- get applied via the Supabase Branching workflow on PR merge if branching is enabled.
+
+### Why this changed
+
+Earlier setup instructions listed sequence-named files (`001_schema.sql` through `013_*`). Those have been removed — production's migration tracker only knows the timestamp-named versions, and the dual naming caused the `Supabase Preview` GitHub check to fail on every commit to `main`. The timestamp files are the canonical set going forward.
 
 ## Step 2: Get Your Service Role Key
 

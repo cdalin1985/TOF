@@ -1,11 +1,92 @@
+-- Recovered from Supabase migration history (version 20260517034450).
+-- Source: supabase_migrations.schema_migrations
+-- Name: workflow_connection_fixes
+
 -- ============================================================
--- TOC App — Migration 009: Rank #1 Obligation Automation
+-- TOC App - Migration 010: Workflow Connection Fixes
 -- ============================================================
 -- Source of truth project: toc1 / ankvjywsnydpkepdvuvm
--- Runs twice daily at 00:00 and 12:00 UTC (6am and 6pm Mountain during MDT).
--- Idempotent: re-running this migration replaces the same cron job name.
+--
+-- Fixes confirmed live drift:
+-- - Rank #1 cron was running old penalty SQL that violates rankings.position.
+-- - Ranking cascades moved rows directly through unique positions.
+-- - submit-result uses an internal matches.status='confirming' lock.
+-- - max_race=15 contradicted the current "no maximum" race rule.
+-- - Sensitive rank helper RPCs were executable outside service_role.
 
-CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA pg_catalog;
+-- Race length canon: min 6, no maximum. NULL max_race means no cap.
+ALTER TABLE public.league_settings
+  ALTER COLUMN max_race DROP NOT NULL;
+
+UPDATE public.league_settings
+SET max_race = NULL;
+
+-- submit-result atomically claims a submitted match by moving it through this
+-- short-lived internal state before confirming the result.
+ALTER TABLE public.matches DROP CONSTRAINT IF EXISTS matches_status_check;
+ALTER TABLE public.matches ADD CONSTRAINT matches_status_check CHECK (status = ANY (ARRAY[
+  'scheduled'::text,
+  'in_progress'::text,
+  'submitted'::text,
+  'confirming'::text,
+  'confirmed'::text,
+  'disputed'::text,
+  'resolved'::text
+]));
+
+-- Replace the older Rank #1 helper before changing apply_rank1_penalty's
+-- return type. A compatibility wrapper is recreated below.
+DROP FUNCTION IF EXISTS public.check_and_enforce_rank1_obligation();
+DROP FUNCTION IF EXISTS public.apply_rank1_penalty(uuid);
+
+CREATE OR REPLACE FUNCTION public.cascade_ranking_after_win(p_winner_id uuid, p_loser_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_winner_pos integer;
+  v_loser_pos integer;
+BEGIN
+  LOCK TABLE public.rankings IN ROW EXCLUSIVE MODE;
+
+  SELECT position INTO v_winner_pos
+  FROM public.rankings
+  WHERE player_id = p_winner_id;
+
+  SELECT position INTO v_loser_pos
+  FROM public.rankings
+  WHERE player_id = p_loser_id;
+
+  IF v_winner_pos IS NULL OR v_loser_pos IS NULL OR v_winner_pos <= v_loser_pos THEN
+    RETURN;
+  END IF;
+
+  -- Move all affected ranks out of the unique position range first.
+  UPDATE public.rankings
+  SET
+    previous_position = position,
+    position = position + 1000,
+    updated_at = now()
+  WHERE position BETWEEN v_loser_pos AND v_winner_pos;
+
+  UPDATE public.rankings
+  SET
+    previous_position = v_winner_pos,
+    position = v_loser_pos,
+    updated_at = now(),
+    rank1_since = CASE WHEN v_loser_pos = 1 THEN now() ELSE rank1_since END
+  WHERE player_id = p_winner_id;
+
+  UPDATE public.rankings
+  SET
+    position = position - 999,
+    updated_at = now(),
+    rank1_since = CASE WHEN position - 1000 = 1 THEN NULL ELSE rank1_since END
+  WHERE position BETWEEN (1000 + v_loser_pos) AND (1000 + v_winner_pos - 1);
+END;
+$$;
 
 CREATE OR REPLACE FUNCTION public.apply_rank1_penalty(p_player_id uuid)
 RETURNS integer
@@ -17,6 +98,8 @@ DECLARE
   v_current_position integer;
   v_target_rank integer;
 BEGIN
+  LOCK TABLE public.rankings IN ROW EXCLUSIVE MODE;
+
   SELECT position
   INTO v_current_position
   FROM public.rankings
@@ -34,8 +117,6 @@ BEGIN
     RETURN NULL;
   END IF;
 
-  -- Move the affected ranks out of the way first so the unique position
-  -- constraint is never violated while we cascade everyone upward.
   UPDATE public.rankings
   SET
     previous_position = position,
@@ -76,14 +157,6 @@ DECLARE
   v_days_elapsed integer;
   v_target_rank integer;
 BEGIN
-  /*
-    Rule:
-    - Rank #1 must play at least 2 confirmed matches against current top-5
-      opponents within 30 days of reaching #1.
-    - If they are overdue and below the requirement, move them to #10, or to
-      the bottom if the list has fewer than 10 players.
-    - If rank1_since is missing, initialize it instead of punishing immediately.
-  */
   SELECT
     r.player_id,
     r.position,
@@ -175,7 +248,7 @@ BEGIN
   VALUES (
     v_rank1.player_id,
     'rank1_penalty',
-    '📉 Rank 1 obligation not met',
+    'Rank 1 obligation not met',
     'You did not play a top-5 opponent twice in your 30-day window. You have been moved to #' || v_target_rank || '.',
     'ranking'
   );
@@ -190,10 +263,36 @@ BEGIN
 END;
 $$;
 
+-- Backward-compatible service-only wrapper for any old job/manual caller.
+CREATE OR REPLACE FUNCTION public.check_and_enforce_rank1_obligation()
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  PERFORM public.enforce_rank1_obligations();
+  RETURN jsonb_build_object('action', 'delegated_to_enforce_rank1_obligations', 'at', now());
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.cascade_ranking_after_win(uuid, uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.apply_rank1_penalty(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.enforce_rank1_obligations() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.check_and_enforce_rank1_obligation() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.expire_stale_challenges() FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION public.cascade_ranking_after_win(uuid, uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.apply_rank1_penalty(uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.enforce_rank1_obligations() TO service_role;
+GRANT EXECUTE ON FUNCTION public.check_and_enforce_rank1_obligation() TO service_role;
+GRANT EXECUTE ON FUNCTION public.expire_stale_challenges() TO service_role;
+
+DROP POLICY IF EXISTS "Anyone can view profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
+CREATE POLICY "Users can view own profile"
+  ON public.profiles FOR SELECT
+  USING ((select auth.uid()) = id);
 
 -- Replace any previous Rank #1 cron job with the intended twice-daily schedule.
 SELECT cron.unschedule(jobid)

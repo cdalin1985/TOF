@@ -9,7 +9,7 @@ function read(path) {
   return readFileSync(join(root, path), 'utf8');
 }
 
-const migration = read('supabase/migrations/013_release_readiness.sql');
+const migration = read('supabase/migrations/20260517213621_013_release_readiness.sql');
 const submitResult = read('supabase/functions/submit-result/index.ts');
 const respondToChallenge = read('supabase/functions/respond-to-challenge/index.ts');
 const resolveDispute = read('supabase/functions/resolve-dispute/index.ts');

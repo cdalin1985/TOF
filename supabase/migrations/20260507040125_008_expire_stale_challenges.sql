@@ -1,3 +1,7 @@
+-- Recovered from Supabase migration history (version 20260507040125).
+-- Source: supabase_migrations.schema_migrations
+-- Name: 008_expire_stale_challenges
+
 -- Auto-expire challenges past their 7-day response window.
 --
 -- The challenges table has expires_at NOT NULL set 7 days into the future
@@ -34,4 +38,3 @@ GRANT EXECUTE ON FUNCTION public.expire_stale_challenges() TO authenticated, ser
 
 COMMENT ON FUNCTION public.expire_stale_challenges() IS
   'Marks any challenges with status=pending and expires_at in the past as status=expired. Returns the number of rows updated. Called by create-challenge edge function before checking for existing pending challenges. Safe to call repeatedly.';
-

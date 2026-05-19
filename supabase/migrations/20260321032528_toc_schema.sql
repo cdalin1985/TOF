@@ -1,11 +1,10 @@
--- ============================================================
--- TOC App — Migration 001: Schema
--- Run this in Supabase SQL Editor
--- ============================================================
+-- Recovered from Supabase migration history (version 20260321032528).
+-- Source: supabase_migrations.schema_migrations
+-- Name: toc_schema
+
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- PROFILES
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT UNIQUE NOT NULL,
@@ -16,7 +15,6 @@ CREATE TABLE IF NOT EXISTS profiles (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- PLAYERS
 CREATE TABLE IF NOT EXISTS players (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   profile_id UUID UNIQUE REFERENCES profiles(id) ON DELETE SET NULL,
@@ -26,7 +24,6 @@ CREATE TABLE IF NOT EXISTS players (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- RANKINGS
 CREATE TABLE IF NOT EXISTS rankings (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   player_id UUID UNIQUE NOT NULL REFERENCES players(id) ON DELETE CASCADE,
@@ -35,7 +32,6 @@ CREATE TABLE IF NOT EXISTS rankings (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- PLAYER REFERENCE METRICS
 CREATE TABLE IF NOT EXISTS player_reference_metrics (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   player_id UUID UNIQUE NOT NULL REFERENCES players(id) ON DELETE CASCADE,
@@ -44,7 +40,6 @@ CREATE TABLE IF NOT EXISTS player_reference_metrics (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- CHALLENGES
 CREATE TABLE IF NOT EXISTS challenges (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   challenger_id UUID NOT NULL REFERENCES players(id),
@@ -65,7 +60,6 @@ CREATE TABLE IF NOT EXISTS challenges (
   CONSTRAINT different_players CHECK (challenger_id != challenged_id)
 );
 
--- MATCHES
 CREATE TABLE IF NOT EXISTS matches (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   challenge_id UUID UNIQUE NOT NULL REFERENCES challenges(id),
@@ -92,7 +86,6 @@ CREATE TABLE IF NOT EXISTS matches (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- NOTIFICATIONS
 CREATE TABLE IF NOT EXISTS notifications (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   player_id UUID NOT NULL REFERENCES players(id),
@@ -105,7 +98,6 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ACTIVITY FEED
 CREATE TABLE IF NOT EXISTS activity_feed (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   event_type TEXT NOT NULL,
@@ -115,7 +107,6 @@ CREATE TABLE IF NOT EXISTS activity_feed (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- COOLDOWNS
 CREATE TABLE IF NOT EXISTS cooldowns (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   player_id UUID NOT NULL REFERENCES players(id),
@@ -124,7 +115,6 @@ CREATE TABLE IF NOT EXISTS cooldowns (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- PLAYER SEASON STATS
 CREATE TABLE IF NOT EXISTS player_season_stats (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   player_id UUID UNIQUE NOT NULL REFERENCES players(id),
@@ -137,7 +127,6 @@ CREATE TABLE IF NOT EXISTS player_season_stats (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- TREASURY LEDGER
 CREATE TABLE IF NOT EXISTS treasury_ledger (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   entry_type TEXT NOT NULL CHECK (entry_type IN ('credit', 'debit', 'correction', 'reversal')),
@@ -148,7 +137,6 @@ CREATE TABLE IF NOT EXISTS treasury_ledger (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- LEAGUE SETTINGS
 CREATE TABLE IF NOT EXISTS league_settings (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   venues TEXT[] NOT NULL DEFAULT ARRAY['Eagles 4040', 'Valley Hub'],
@@ -165,7 +153,6 @@ INSERT INTO league_settings (venues, disciplines)
 SELECT ARRAY['Eagles 4040', 'Valley Hub'], ARRAY['8 Ball', '9 Ball', '10 Ball']
 WHERE NOT EXISTS (SELECT 1 FROM league_settings);
 
--- AUDIT EVENTS
 CREATE TABLE IF NOT EXISTS audit_events (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   actor_profile_id UUID REFERENCES profiles(id),
@@ -176,7 +163,6 @@ CREATE TABLE IF NOT EXISTS audit_events (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- INDEXES
 CREATE INDEX IF NOT EXISTS idx_rankings_position ON rankings(position);
 CREATE INDEX IF NOT EXISTS idx_challenges_status ON challenges(status);
 CREATE INDEX IF NOT EXISTS idx_challenges_challenger ON challenges(challenger_id, status);
@@ -188,14 +174,12 @@ CREATE INDEX IF NOT EXISTS idx_cooldowns_player ON cooldowns(player_id, expires_
 CREATE INDEX IF NOT EXISTS idx_players_profile ON players(profile_id);
 CREATE INDEX IF NOT EXISTS idx_treasury_created ON treasury_ledger(created_at DESC);
 
--- REALTIME
 ALTER PUBLICATION supabase_realtime ADD TABLE rankings;
 ALTER PUBLICATION supabase_realtime ADD TABLE challenges;
 ALTER PUBLICATION supabase_realtime ADD TABLE matches;
 ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
 ALTER PUBLICATION supabase_realtime ADD TABLE activity_feed;
 
--- AUTO-CREATE PROFILE TRIGGER
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
