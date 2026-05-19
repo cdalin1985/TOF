@@ -112,6 +112,7 @@ export const Layout: React.FC = () => {
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_feed' }, () => {
         queryClient.invalidateQueries({ queryKey: ['activity-feed'] });
+        queryClient.invalidateQueries({ queryKey: ['activity-feed-full'] });
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };

@@ -6,6 +6,7 @@ const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+const VALID_VENUES = ['Eagles 4040', 'Valley Hub'];
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -27,46 +28,67 @@ serve(async (req) => {
       if (challenge.challenged_id !== callerPlayer.id) return new Response(JSON.stringify({ error: 'Not authorized.' }), { headers: cors });
       if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Challenge is not pending.' }), { headers: cors });
       if (!venue || !scheduled_at) return new Response(JSON.stringify({ error: 'venue and scheduled_at required.' }), { headers: cors });
+      const scheduledAt = new Date(scheduled_at);
+      if (Number.isNaN(scheduledAt.getTime())) return new Response(JSON.stringify({ error: 'scheduled_at must be a valid date.' }), { status: 400, headers: cors });
+      if (scheduledAt.getTime() < Date.now() - 5 * 60 * 1000) return new Response(JSON.stringify({ error: 'Match cannot be scheduled in the past.' }), { status: 400, headers: cors });
+
+      const { data: settings } = await supabase.from('league_settings').select('venues').single();
+      const validVenues = Array.isArray(settings?.venues) && settings.venues.length > 0 ? settings.venues : VALID_VENUES;
+      if (typeof venue !== 'string' || !validVenues.includes(venue)) {
+        return new Response(JSON.stringify({ error: 'Venue is not in league settings.' }), { status: 400, headers: cors });
+      }
 
       // Match must be played within 10 days of acceptance
       const matchDeadline = new Date(Date.now() + 10 * 24 * 3600 * 1000).toISOString();
 
-      await supabase.from('challenges').update({
-        status: 'scheduled',
-        venue,
-        scheduled_at,
-        match_deadline: matchDeadline,
-      }).eq('id', challenge_id);
+      const { data: scheduledChallenge, error: updateError } = await supabase
+        .from('challenges')
+        .update({
+          status: 'scheduled',
+          venue,
+          scheduled_at: scheduledAt.toISOString(),
+          match_deadline: matchDeadline,
+        })
+        .eq('id', challenge_id)
+        .eq('status', 'pending')
+        .select('id');
+      if (updateError) throw updateError;
+      if (!scheduledChallenge?.length) {
+        return new Response(JSON.stringify({ error: 'Challenge is no longer pending.' }), { status: 409, headers: cors });
+      }
 
-      const { data: match } = await supabase.from('matches').insert({
+      const { data: match, error: insertError } = await supabase.from('matches').insert({
         challenge_id,
         player1_id: challenge.challenger_id,
         player2_id: challenge.challenged_id,
         discipline: challenge.discipline,
         race_length: challenge.race_length,
         venue,
-        scheduled_at,
+        scheduled_at: scheduledAt.toISOString(),
         status: 'scheduled',
       }).select().single();
+      if (insertError) throw insertError;
 
       const { data: challengedPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenged_id).single();
-      await supabase.from('notifications').insert({
+      const { error: notificationError } = await supabase.from('notifications').insert({
         player_id: challenge.challenger_id,
         type: 'challenge_accepted',
         title: `✅ Challenge accepted!`,
-        body: `${challengedPlayer?.full_name} accepted your ${challenge.discipline} challenge. Match on ${new Date(scheduled_at).toLocaleDateString()} at ${venue}.`,
+        body: `${challengedPlayer?.full_name} accepted your ${challenge.discipline} challenge. Match on ${scheduledAt.toLocaleDateString()} at ${venue}.`,
         reference_id: match?.id,
         reference_type: 'match',
       });
+      if (notificationError) throw notificationError;
       await sendPush(supabase, challenge.challenger_id, `✅ Challenge accepted!`, `${challengedPlayer?.full_name} accepted. Match at ${venue}.`, `/match/${match?.id}`);
 
       const { data: challengerPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenger_id).single();
-      await supabase.from('activity_feed').insert({
+      const { error: activityError } = await supabase.from('activity_feed').insert({
         event_type: 'challenge_accepted',
         headline: `${challengedPlayer?.full_name} accepted ${challengerPlayer?.full_name}'s ${challenge.discipline} challenge!`,
-        detail: `Match at ${venue} on ${new Date(scheduled_at).toLocaleDateString()} · race to ${challenge.race_length}`,
+        detail: `Match at ${venue} on ${scheduledAt.toLocaleDateString()} · race to ${challenge.race_length}`,
         actor_player_id: challenge.challenged_id,
       });
+      if (activityError) throw activityError;
 
     } else if (action === 'decline') {
       if (challenge.challenged_id !== callerPlayer.id) return new Response(JSON.stringify({ error: 'Not authorized.' }), { headers: cors });

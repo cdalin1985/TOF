@@ -89,6 +89,14 @@ export interface Database {
           status: 'scheduled' | 'in_progress' | 'submitted' | 'confirming' | 'confirmed' | 'disputed' | 'resolved';
           player1_submitted: boolean;
           player2_submitted: boolean;
+          player1_submitted_winner_id: string | null;
+          player2_submitted_winner_id: string | null;
+          player1_submitted_player1_score: number | null;
+          player1_submitted_player2_score: number | null;
+          player2_submitted_player1_score: number | null;
+          player2_submitted_player2_score: number | null;
+          player1_submitted_at: string | null;
+          player2_submitted_at: string | null;
           player1_confirmed: boolean;
           player2_confirmed: boolean;
           player1_payment_method: 'cash_envelope' | 'paypal' | 'cash_app' | 'venmo' | null;

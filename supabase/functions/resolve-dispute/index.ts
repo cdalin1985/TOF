@@ -11,6 +11,35 @@ const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   cash_app: 'Cash App',
   venmo: 'Venmo',
 };
+const ALLOWED_RESOLUTION_STATUSES = ['disputed'];
+const FORCE_COMPLETE_STATUSES = ['scheduled', 'in_progress', 'submitted'];
+
+function validateFinalScore(
+  winnerId: string,
+  player1Id: string,
+  player2Id: string,
+  finalScorePlayer1: number,
+  finalScorePlayer2: number,
+  raceTarget: number,
+): string | null {
+  if (![player1Id, player2Id].includes(winnerId)) {
+    return 'Winner must be one of the match players.';
+  }
+  if (!Number.isInteger(finalScorePlayer1) || !Number.isInteger(finalScorePlayer2) || finalScorePlayer1 < 0 || finalScorePlayer2 < 0) {
+    return 'Scores must be non-negative whole numbers.';
+  }
+  if (finalScorePlayer1 > raceTarget || finalScorePlayer2 > raceTarget) {
+    return 'Score cannot exceed race length.';
+  }
+  if (finalScorePlayer1 === finalScorePlayer2) {
+    return 'Tie not possible. Select the player who reached the race length.';
+  }
+  const winnerScore = winnerId === player1Id ? finalScorePlayer1 : finalScorePlayer2;
+  const loserScore = winnerId === player1Id ? finalScorePlayer2 : finalScorePlayer1;
+  if (winnerScore < raceTarget) return `Winner must reach race length ${raceTarget}.`;
+  if (loserScore >= raceTarget) return 'Only the winner can reach the race length.';
+  return null;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -33,6 +62,7 @@ serve(async (req) => {
       notes,
       player1_payment_method,
       player2_payment_method,
+      force_complete = false,
     } = await req.json();
 
     const normalizePayment = (value: unknown): PaymentMethod | null => {
@@ -51,6 +81,14 @@ serve(async (req) => {
 
     const { data: match } = await supabase.from('matches').select('*').eq('id', match_id).single();
     if (!match) return new Response(JSON.stringify({ error: 'Match not found.' }), { headers: cors });
+    const canResolveDispute = ALLOWED_RESOLUTION_STATUSES.includes(match.status);
+    const canForceComplete = force_complete === true && FORCE_COMPLETE_STATUSES.includes(match.status);
+    if (!canResolveDispute && !canForceComplete) {
+      return new Response(JSON.stringify({ error: 'Only disputed matches or explicit admin force-complete matches can be resolved.' }), { status: 409, headers: cors });
+    }
+
+    const scoreError = validateFinalScore(winner_id, match.player1_id, match.player2_id, final_score_player1, final_score_player2, match.race_length);
+    if (scoreError) return new Response(JSON.stringify({ error: scoreError }), { status: 400, headers: cors });
 
     const loser_id = winner_id === match.player1_id ? match.player2_id : match.player1_id;
 
@@ -65,10 +103,20 @@ serve(async (req) => {
     };
     if (explicitPlayer1Payment) matchUpdate.player1_payment_method = explicitPlayer1Payment;
     if (explicitPlayer2Payment) matchUpdate.player2_payment_method = explicitPlayer2Payment;
-    await supabase.from('matches').update(matchUpdate).eq('id', match_id);
+    const { data: claimedRows, error: matchUpdateError } = await supabase
+      .from('matches')
+      .update(matchUpdate)
+      .eq('id', match_id)
+      .eq('status', match.status)
+      .select('id');
+    if (matchUpdateError) throw matchUpdateError;
+    if (!claimedRows?.length) {
+      return new Response(JSON.stringify({ error: 'Match resolution was already handled.' }), { status: 409, headers: cors });
+    }
 
     if (match.challenge_id) {
-      await supabase.from('challenges').update({ status: 'resolved' }).eq('id', match.challenge_id);
+      const { error: challengeError } = await supabase.from('challenges').update({ status: 'resolved' }).eq('id', match.challenge_id);
+      if (challengeError) throw challengeError;
     }
 
     // Apply ranking cascade atomically via RPC

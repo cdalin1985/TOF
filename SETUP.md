@@ -28,6 +28,8 @@ npx supabase db push
 
 `db push` reads every `.sql` file in `supabase/migrations/`, sorts by filename (timestamp order), and applies any that the project does not already have in its tracker. Safe to re-run.
 
+The latest migration in this release is `20260519110000_release_hardening_guardrails.sql` — it adds per-player submission columns and `NOT VALID` `CHECK` constraints, so result submission paths will fail at runtime if the edge functions deploy without it.
+
 ### For the existing `toc1` production project (`ankvjywsnydpkepdvuvm`)
 
 All current migrations are already applied. New migrations land via PRs and either:
@@ -67,7 +69,10 @@ npx supabase functions deploy manage-treasury
 npx supabase functions deploy rank1-compliance
 npx supabase functions deploy add-player
 npx supabase functions deploy send-push
+npx supabase functions deploy set-player-active
 ```
+
+The `_shared` folder is support code imported by Edge Functions. Do not deploy it by itself; deploy every function directory listed above whenever this release is promoted.
 
 After the deploy works, revoke the temporary Supabase access token from your Supabase account page.
 

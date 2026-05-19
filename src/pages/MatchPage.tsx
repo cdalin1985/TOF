@@ -241,6 +241,19 @@ export default function MatchPage() {
   const p2Name = rankings.find((r) => r.player.id === match.player2_id)?.player.full_name ?? 'Player 2';
   const p1Pos  = rankings.find((r) => r.player.id === match.player1_id)?.ranking.position ?? 1;
   const p2Pos  = rankings.find((r) => r.player.id === match.player2_id)?.ranking.position ?? 2;
+  const player1ReachedRace = match.player1_score >= match.race_length;
+  const player2ReachedRace = match.player2_score >= match.race_length;
+  const raceWinnerId = player1ReachedRace !== player2ReachedRace
+    ? player1ReachedRace ? match.player1_id : match.player2_id
+    : null;
+  const raceSubmissionReason = !player1ReachedRace && !player2ReachedRace
+    ? `Race to ${match.race_length}: a player must reach ${match.race_length} games before submitting.`
+    : !raceWinnerId
+    ? 'Only one player can be at the race length. Adjust the score before submitting.'
+    : '';
+  const canSubmitRaceResult = raceWinnerId !== null && raceSubmissionReason === '';
+  const raceWinnerName = raceWinnerId === match.player1_id ? p1Name : raceWinnerId === match.player2_id ? p2Name : '';
+  const paymentMethodAvailable = (method: PaymentMethodDefinition) => !method.urlEnv || !!paymentMethodUrl(method.id);
 
   const callFn = async (path: string, body: object) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -304,28 +317,48 @@ export default function MatchPage() {
   };
 
   const handleSubmitResult = async () => {
-    if (!submittedWinner || !paymentMethod) return;
+    const winnerId = raceWinnerId;
+    if (!winnerId) {
+      setSubmitError(raceSubmissionReason || 'Complete the race before submitting.');
+      return;
+    }
+    if (submittedWinner !== winnerId) {
+      setSubmittedWinner(winnerId);
+      setSubmitError(`${raceWinnerName} is the valid winner for this score.`);
+      return;
+    }
+    if (!paymentMethod) return;
+    const selectedPayment = PAYMENT_METHODS.find((method) => method.id === paymentMethod);
+    if (!selectedPayment || !paymentMethodAvailable(selectedPayment)) {
+      setSubmitError('Choose cash envelope or a configured digital payment link.');
+      return;
+    }
     setSubmitting(true);
     setSubmitError('');
-    const json = await callFn('submit-result', {
-      match_id: match.id,
-      winner_id: submittedWinner,
-      final_score_player1: match.player1_score,
-      final_score_player2: match.player2_score,
-      payment_method: paymentMethod,
-    });
-    setSubmitting(false);
-    if (json.error) { setSubmitError(json.error); return; }
-    setSubmitStep(null);
-    setLastScoreAction(null);
-    qc.invalidateQueries({ queryKey: ['match', id] });
-    qc.invalidateQueries({ queryKey: ['rankings'] });
-    qc.invalidateQueries({ queryKey: ['matches'] });
-    qc.invalidateQueries({ queryKey: ['home-action-matches'] });
-    qc.invalidateQueries({ queryKey: ['home-pending-challenges'] });
-    qc.invalidateQueries({ queryKey: ['notifications'] });
-    qc.invalidateQueries({ queryKey: ['activity-feed'] });
-    qc.invalidateQueries({ queryKey: ['treasury'] });
+    try {
+      const json = await callFn('submit-result', {
+        match_id: match.id,
+        winner_id: winnerId,
+        final_score_player1: match.player1_score,
+        final_score_player2: match.player2_score,
+        payment_method: paymentMethod,
+      });
+      if (json.error) { setSubmitError(json.error); return; }
+      setSubmitStep(null);
+      setLastScoreAction(null);
+      qc.invalidateQueries({ queryKey: ['match', id] });
+      qc.invalidateQueries({ queryKey: ['rankings'] });
+      qc.invalidateQueries({ queryKey: ['matches'] });
+      qc.invalidateQueries({ queryKey: ['home-action-matches'] });
+      qc.invalidateQueries({ queryKey: ['home-pending-challenges'] });
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['activity-feed'] });
+      qc.invalidateQueries({ queryKey: ['treasury'] });
+    } catch (e) {
+      setSubmitError(e instanceof Error ? e.message : 'Result submission failed.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const hasSubmitted = (isPlayer1 && match.player1_submitted) || (isPlayer2 && match.player2_submitted);
@@ -419,9 +452,31 @@ export default function MatchPage() {
           )}
 
           {(match.status === 'in_progress' || match.status === 'submitted') && !hasSubmitted && (
-            <Button variant="primary" fullWidth size="lg" onClick={() => { setSubmitStep('winner'); setSubmitError(''); }}>
-              <Flag size={18} /> {match.status === 'submitted' ? 'Confirm Result' : 'Submit Final Result'}
-            </Button>
+            <div className="space-y-2">
+              <Button
+                variant="primary"
+                fullWidth
+                size="lg"
+                disabled={!canSubmitRaceResult}
+                onClick={() => {
+                  if (!canSubmitRaceResult) {
+                    setSubmitError(raceSubmissionReason);
+                    return;
+                  }
+                  setSubmittedWinner(raceWinnerId);
+                  setPaymentMethod(null);
+                  setSubmitStep('winner');
+                  setSubmitError('');
+                }}
+              >
+                <Flag size={18} /> {match.status === 'submitted' ? 'Confirm Result' : 'Submit Final Result'}
+              </Button>
+              {raceSubmissionReason && (
+                <div className="text-[#F59E0B] text-xs font-[Barlow] p-3 bg-[#F59E0B]/10 rounded-lg border border-[#F59E0B]/20">
+                  {raceSubmissionReason}
+                </div>
+              )}
+            </div>
           )}
 
           {hasSubmitted && match.status === 'submitted' && (
@@ -478,35 +533,58 @@ export default function MatchPage() {
                   <p className="text-[#9CA3AF] text-sm font-[Barlow] mb-5">
                     Final score: {match.player1_score}–{match.player2_score}
                   </p>
+                  {raceWinnerName && (
+                    <div className="text-[#22C55E] text-xs font-[Barlow] p-3 mb-3 bg-[#22C55E]/10 rounded-lg border border-[#22C55E]/20">
+                      {raceWinnerName} is auto-selected because they reached the race length.
+                    </div>
+                  )}
+                  {raceSubmissionReason && (
+                    <div className="text-[#F59E0B] text-xs font-[Barlow] p-3 mb-3 bg-[#F59E0B]/10 rounded-lg border border-[#F59E0B]/20">
+                      {raceSubmissionReason}
+                    </div>
+                  )}
                   <div className="space-y-3 mb-5">
                     {[
                       { id: match.player1_id, name: p1Name, score: match.player1_score, pos: p1Pos },
                       { id: match.player2_id, name: p2Name, score: match.player2_score, pos: p2Pos },
-                    ].map((p) => (
-                      <button
-                        key={p.id}
-                        onClick={() => setSubmittedWinner(p.id)}
-                        className={[
-                          'w-full flex items-center gap-3 p-4 rounded-xl border transition-all',
-                          submittedWinner === p.id
-                            ? 'border-[#22C55E] bg-[#22C55E]/10'
-                            : 'border-[#333] bg-[#252525]/50',
-                        ].join(' ')}
-                      >
-                        <PoolBall position={p.pos} size={36} />
-                        <div className="flex-1 text-left">
-                          <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">{p.name}</div>
-                          <div className="text-[#9CA3AF] text-xs font-[Azeret_Mono]">{p.score} games</div>
-                        </div>
-                        {submittedWinner === p.id && <CheckCircle size={20} className="text-[#22C55E]" />}
-                      </button>
-                    ))}
+                    ].map((p) => {
+                      const isValidWinner = p.id === raceWinnerId;
+                      const selected = submittedWinner === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          disabled={!isValidWinner}
+                          onClick={() => {
+                            if (isValidWinner) setSubmittedWinner(p.id);
+                          }}
+                          className={[
+                            'w-full flex items-center gap-3 p-4 rounded-xl border transition-all',
+                            selected
+                              ? 'border-[#22C55E] bg-[#22C55E]/10'
+                              : 'border-[#333] bg-[#252525]/50',
+                            !isValidWinner ? 'opacity-55 cursor-not-allowed' : '',
+                          ].join(' ')}
+                        >
+                          <PoolBall position={p.pos} size={36} />
+                          <div className="flex-1 text-left">
+                            <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">{p.name}</div>
+                            <div className="text-[#9CA3AF] text-xs font-[Azeret_Mono]">{p.score} games</div>
+                            {!isValidWinner && (
+                              <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">
+                                Winner must reach {match.race_length}.
+                              </div>
+                            )}
+                          </div>
+                          {selected && <CheckCircle size={20} className="text-[#22C55E]" />}
+                        </button>
+                      );
+                    })}
                   </div>
                   <div className="flex gap-2">
                     <Button variant="ghost" fullWidth onClick={() => setSubmitStep(null)}>Cancel</Button>
                     <Button
                       variant="primary" fullWidth
-                      disabled={!submittedWinner}
+                      disabled={submittedWinner !== raceWinnerId}
                       onClick={() => setSubmitStep('payment')}
                     >
                       Next →
@@ -526,18 +604,23 @@ export default function MatchPage() {
                       const Icon = PAYMENT_ICONS[method.id];
                       const selected = paymentMethod === method.id;
                       const link = method.urlEnv ? paymentMethodUrl(method.id) : undefined;
+                      const available = paymentMethodAvailable(method);
                       const helperText = method.urlEnv && !link
-                        ? `${method.helper} (link not configured yet)`
+                        ? 'Payment link not configured. Use cash envelope or ask an admin.'
                         : method.helper;
                       return (
                         <button
                           key={method.id}
-                          onClick={() => setPaymentMethod(method.id)}
+                          disabled={!available}
+                          onClick={() => {
+                            if (available) setPaymentMethod(method.id);
+                          }}
                           className={[
                             'w-full flex items-center gap-3 p-4 rounded-xl border transition-all text-left',
                             selected
                               ? 'border-[#C62828] bg-[#C62828]/10'
                               : 'border-[#333] bg-[#252525]/50',
+                            !available ? 'opacity-55 cursor-not-allowed' : '',
                           ].join(' ')}
                         >
                           <Icon size={22} className="text-[#9CA3AF] shrink-0" />

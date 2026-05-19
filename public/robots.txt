@@ -1,6 +1,21 @@
-# Top of the Capital — Helena Pool League
-# This is a private, auth-walled league app — nothing useful for crawlers to index.
+# Top of the Capital - Helena Pool League
+# Private, auth-walled league app. Let social preview fetchers read only the
+# public preview shell and assets; keep app routes closed to general crawlers.
+
+User-agent: Twitterbot
+User-agent: facebookexternalhit
+User-agent: Facebot
+User-agent: Slackbot-LinkExpanding
+User-agent: Discordbot
+User-agent: LinkedInBot
+User-agent: WhatsApp
+User-agent: TelegramBot
+User-agent: Applebot
+Allow: /$
+Allow: /og-image.png
+Allow: /toc-icon.svg
+Allow: /manifest.json
+Disallow: /
 
 User-agent: *
 Disallow: /
-

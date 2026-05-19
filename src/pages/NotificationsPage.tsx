@@ -35,10 +35,11 @@ function RespondInline({
   challengeId: string;
   onDone: () => void;
 }) {
-  const [open, setOpen]   = useState(false);
+  const [open, setOpen] = useState(false);
+  const [showDeclineConfirm, setShowDeclineConfirm] = useState(false);
   const [venue, setVenue] = useState<Venue | ''>('');
-  const [date, setDate]   = useState('');
-  const [time, setTime]   = useState('');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -54,8 +55,11 @@ function RespondInline({
 
   const handleDecline = async () => {
     setLoading(true);
-    await callFn({ challenge_id: challengeId, action: 'decline' });
+    setError('');
+    const json = await callFn({ challenge_id: challengeId, action: 'decline' });
     setLoading(false);
+    if (json.error) { setError(json.error); return; }
+    setShowDeclineConfirm(false);
     onDone();
   };
 
@@ -72,13 +76,38 @@ function RespondInline({
 
   if (!open) {
     return (
-      <div className="flex gap-2 mt-2">
-        <Button variant="danger" size="sm" loading={loading} onClick={handleDecline}>
-          Decline
-        </Button>
-        <Button variant="success" size="sm" onClick={() => setOpen(true)}>
-          Accept ✓
-        </Button>
+      <div className="mt-3 space-y-2">
+        {showDeclineConfirm ? (
+          <div className="space-y-3 p-3 rounded-xl border border-[#EF4444]/40 bg-[#EF4444]/5">
+            <div className="text-sm font-[Barlow] font-semibold text-[#E8E2D6]">
+              Decline counts as a forfeit
+            </div>
+            <ul className="text-xs font-[Barlow] text-[#9CA3AF] space-y-1 list-disc list-inside">
+              <li>The challenger gets a win by forfeit and may take your spot if they are lower ranked.</li>
+              <li>You get a forfeit on your record and a post-match cooldown.</li>
+              <li>No match fee is owed.</li>
+              <li>An admin can reverse this only if your rankings and stats have not changed yet.</li>
+            </ul>
+            {error && <p className="text-[#EF4444] text-xs font-[Barlow]">{error}</p>}
+            <div className="flex gap-2 pt-1">
+              <Button variant="ghost" fullWidth size="sm" onClick={() => setShowDeclineConfirm(false)} disabled={loading}>
+                Keep pending
+              </Button>
+              <Button variant="danger" fullWidth size="sm" onClick={handleDecline} loading={loading}>
+                Decline anyway
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <Button variant="danger" size="sm" disabled={loading} onClick={() => { setError(''); setShowDeclineConfirm(true); }}>
+              Decline (forfeit)
+            </Button>
+            <Button variant="success" size="sm" onClick={() => { setError(''); setOpen(true); }}>
+              Accept ✓
+            </Button>
+          </div>
+        )}
       </div>
     );
   }

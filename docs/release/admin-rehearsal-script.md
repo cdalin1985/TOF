@@ -9,8 +9,28 @@
 > stop the scene, scribe prompts, and any cleanup notes.
 >
 > **Environment:** Run against a clean test database or a sandbox project
-> with at least 16 seeded players. Confirm the migration `013_release_readiness.sql`
-> is applied before Act I.
+> with at least 16 seeded players. Confirm migrations `001_schema.sql`
+> through `013_release_readiness.sql` are applied before Act I.
+
+---
+
+## Runway, Timing, and Skip Rules
+
+**Runway:**
+- T-48 hours: confirm the sandbox database is clean, migrations 001-013 are applied, and every current Edge Function directory is deployed.
+- T-24 hours: confirm seeded players, role assignments, push notification permission, OG image response, and admin/super-admin login access.
+- T-2 hours: open the deployed app on two phones plus one laptop, clear stale sessions, and assign the Director/Scribe.
+- T-15 minutes: freeze seed data except for the script, start the scribe log, and mark the rehearsal start timestamp for cleanup.
+
+**Timing target:** 150 minutes total. Act I gets 25 minutes, Act II gets 70 minutes, Act III gets 45 minutes, and Curtain gets 10 minutes. Call a five-minute reset if any scene burns more than 1.5x its budget.
+
+**Critical path:** do not launch without passing auth/home, public treasury read, normal challenge acceptance, first-challenge up-10 validation, Rank #1 challenge-anyone validation, regular non-top-10 up-5 validation, completed-match treasury credits, decline-as-forfeit cooldown, inactive/unclaimed rejection, non-super-admin treasury denial, and Rank #1 enforcement.
+
+**Skip rules:**
+- Never skip a critical-path scene.
+- If time is short, skip only optional depth scenes: 2.3 disputed match, 3.2 hard reversal, or 3.6 settings change visibility.
+- Do not skip cleanup notes. If a scene is skipped, the scribe records the reason, owner, and whether that gap blocks release.
+- If a critical-path scene fails, stop the rehearsal and file the follow-up before continuing. Later passing scenes do not erase the failure.
 
 ---
 
@@ -39,7 +59,7 @@
 | MID-10         | #10         | Top-10 boundary; can challenge up the ladder         |
 | MID-11         | #11         | Just outside top-10; tests normal ±5 range          |
 | MID-12         | #12         | Cooldown subject after Act II match                  |
-| BOTTOM         | last rank   | First-challenge band test                            |
+| BOTTOM         | last rank   | First-challenge up-10 band test; no prior challenges |
 | INACTIVE       | varies      | Marked inactive — should reject challenges          |
 | UNCLAIMED      | varies      | No profile attached — should not log in            |
 | PENDING        | varies      | Already has an open incoming challenge              |
@@ -140,6 +160,43 @@ Goal: prove the read-only surfaces are believable before anyone touches state.
 Goal: drive enough volume through the core flows that breakage shakes loose.
 Run the scenes in order; do not interleave.
 
+## Scene 2.0 - BOTTOM first challenge can reach 10 spots up
+
+**Cast:** BOTTOM, MID-6.
+
+**Prompt:**
+> "BOTTOM is a new league member with no prior challenge history. Their first
+> challenge should be allowed up to 10 spots above, but not 11 or more."
+
+**Exact app actions:**
+1. BOTTOM opens Rankings, taps Can Challenge.
+2. Confirm the highest eligible target is the player 10 spots above BOTTOM
+   (with 16 seeded players, rank #6).
+3. BOTTOM opens the direct challenge URL for the player 11 spots above
+   BOTTOM (with 16 seeded players, rank #5) and tries to submit race 6.
+4. BOTTOM challenges MID-6, 9 Ball, race 6.
+5. BOTTOM opens Challenges and cancels the outgoing challenge before MID-6
+   responds.
+
+**Expected response:**
+- Step 2 shows up to 10 spots above BOTTOM, not just the regular five.
+- Step 3 is rejected with a clear first-challenge range message.
+- Step 4 creates the challenge without a range error.
+- Step 5 leaves MID-6 with no pending incoming challenge.
+
+**Watch for:**
+- BOTTOM getting only the regular five-spot band on their first challenge.
+- The direct URL bypassing the first-challenge range cap.
+
+**Failure signals:**
+- A first challenge more than 10 spots above BOTTOM is created.
+- Cleanup leaves MID-6 blocked by an open incoming challenge.
+
+**Scribe prompts:**
+- "Could a new member understand why the 10-spot rule applied only to their first challenge?"
+
+**Cleanup:** confirm the BOTTOM -> MID-6 challenge is cancelled before Scene 2.1.
+
 ## Scene 2.1 — Chase challenges MID-6
 
 **Cast:** Chase, MID-6 (Chase drives MID-6's session on a second device).
@@ -171,9 +228,42 @@ Run the scenes in order; do not interleave.
 **Scribe prompts:**
 - "Did either of you have to scroll to find the action button?"
 
-**Cleanup:** none. The match advances into Scene 2.3.
+**Cleanup:** leave the match card in place for later match-flow review.
 
-## Scene 2.2 — Frank challenges TOP-1 for Rank #1 pressure
+## Scene 2.2A - TOP-1 can challenge anyone
+
+**Cast:** Frank (acts as TOP-1), BOTTOM.
+
+**Prompt:**
+> "Rank #1 is not trapped at the top. We want to prove #1 can issue a
+> challenge to any active, claimed player, including the bottom of the list."
+
+**Exact app actions:**
+1. TOP-1 opens Rankings and taps Can Challenge.
+2. Confirm BOTTOM and at least two mid-table players show Challenge buttons.
+3. TOP-1 challenges BOTTOM, 10 Ball, race 6.
+4. TOP-1 opens Challenges and cancels the outgoing challenge before BOTTOM
+   responds.
+
+**Expected response:**
+- BOTTOM is eligible even though the rank gap is larger than five spots.
+- The challenge is created without a range error.
+- The cancellation posts cleanly and BOTTOM has no pending challenge left.
+
+**Watch for:**
+- Can Challenge filtering TOP-1 down to only nearby ranks.
+- Direct challenge creation blocked by the normal up/down five rule.
+
+**Failure signals:**
+- Rank #1 cannot create the challenge.
+- Cleanup leaves BOTTOM with an open incoming challenge.
+
+**Scribe prompts:**
+- "Did the app make it clear that Rank #1 has the special challenge-anyone rule?"
+
+**Cleanup:** confirm the TOP-1 -> BOTTOM challenge is cancelled before later challenge-band scenes.
+
+## Scene 2.2B - Frank challenges TOP-1 for Rank #1 pressure
 
 **Cast:** Frank, TOP-1.
 
@@ -204,7 +294,7 @@ Run the scenes in order; do not interleave.
 **Scribe prompts:**
 - "How obvious was the undo? Where did you look first?"
 
-**Cleanup:** leave the match in progress; Scene 2.5 finishes it.
+**Cleanup:** leave the match in progress only if it will not block later Rank #1 enforcement; otherwise reset it in the sandbox before Scene 3.3.
 
 ## Scene 2.3 — Disputed match (MID-7 vs MID-8)
 
@@ -480,26 +570,34 @@ rest of the rehearsal).
 
 **Exact app actions:**
 1. Both open Treasury and write down the balance.
-2. Chase: Admin → Treasury → add a +$25 credit "Test sponsorship deposit."
-3. Chase: add a -$5 debit "Refund for cancelled match." (Description
+2. Frank: Admin -> Treasury -> try to add a +$1 credit "Unauthorized test."
+3. Confirm Frank is denied because he is an admin, not a super_admin, and
+   the public balance does not move.
+4. Chase: Admin -> Treasury -> add a +$25 credit "Test sponsorship deposit."
+5. Chase: add a -$5 debit "Refund for cancelled match." (Description
    counts.)
-4. Chase: add a correction entry of -$0.50 by entering a `correction`
+6. Chase: add a correction entry of -$0.50 by entering a `correction`
    row via SQL or the manage-treasury edge function (the UI currently
    exposes only credit/debit; record this as a rehearsal note).
-5. Frank refreshes Treasury and confirms balance moved by exactly +$19.50.
+7. Frank refreshes Treasury and confirms balance moved by exactly +$19.50
+   from the original balance.
 
 **Expected response:**
-- Step 2-3: activity feed shows `treasury_entry_credit` and
+- Step 2: the Edge Function refuses Frank with a clear permission error and
+  creates no ledger or activity row.
+- Step 4-5: activity feed shows `treasury_entry_credit` and
   `treasury_entry_debit` events with the description.
-- Step 5: public and admin balances agree; the ledger sign column reads
-  `+`, `−`, `−` for the three new rows.
+- Step 7: public and admin balances agree; the ledger sign column reads
+  `+`, `-`, `-` for the three new rows.
 
 **Watch for:**
+- Non-super-admin seeing a successful treasury mutation.
 - Public Treasury page lagging behind the admin tab.
 - Correction entry showing `correction` but altering the balance the
   wrong direction.
 
 **Failure signals:**
+- Frank's unauthorized +$1 appears in the ledger or activity feed.
 - Balance moves by an unexpected amount.
 - Audit log missing one of the three entries.
 

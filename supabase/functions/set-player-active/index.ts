@@ -20,11 +20,15 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
-  if (!supabaseUrl || !anonKey) return json({ error: 'Server configuration missing.' }, 500);
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (!supabaseUrl || !anonKey || !serviceRoleKey) return json({ error: 'Server configuration missing.' }, 500);
 
   const authHeader = req.headers.get('Authorization') ?? '';
   const supabase = createClient(supabaseUrl, anonKey, {
     global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
@@ -32,7 +36,7 @@ serve(async (req) => {
   const user = userData?.user;
   if (userError || !user) return json({ error: 'Unauthorized' }, 401);
 
-  const { data: actorProfile, error: actorError } = await supabase
+  const { data: actorProfile, error: actorError } = await adminClient
     .from('profiles')
     .select('id, role')
     .eq('id', user.id)
@@ -45,7 +49,7 @@ serve(async (req) => {
   if (!body || typeof body.player_id !== 'string') return json({ error: 'player_id is required.' }, 400);
   if (typeof body.is_active !== 'boolean') return json({ error: 'is_active must be true or false.' }, 400);
 
-  const { data: existingPlayer, error: readError } = await supabase
+  const { data: existingPlayer, error: readError } = await adminClient
     .from('players')
     .select('id, full_name, is_active, profile_id')
     .eq('id', body.player_id)
@@ -57,7 +61,7 @@ serve(async (req) => {
     return json({ success: true, changed: false, player: existingPlayer });
   }
 
-  const { data: updatedPlayer, error: updateError } = await supabase
+  const { data: updatedPlayer, error: updateError } = await adminClient
     .from('players')
     .update({ is_active: body.is_active })
     .eq('id', body.player_id)
@@ -66,7 +70,7 @@ serve(async (req) => {
 
   if (updateError || !updatedPlayer) return json({ error: updateError?.message ?? 'Could not update player.' }, 500);
 
-  await supabase.from('audit_events').insert({
+  const { error: auditError } = await adminClient.from('audit_events').insert({
     actor_profile_id: actorProfile.id,
     action: body.is_active ? 'player.activated' : 'player.deactivated',
     target_type: 'player',
@@ -78,13 +82,15 @@ serve(async (req) => {
       claimed_profile_status: existingPlayer.profile_id ? 'claimed' : 'unclaimed',
     },
   });
+  if (auditError) return json({ error: auditError.message }, 500);
 
-  await supabase.from('activity_feed').insert({
+  const { error: activityError } = await adminClient.from('activity_feed').insert({
     event_type: body.is_active ? 'player_activated' : 'player_deactivated',
     headline: `Admin ${body.is_active ? 'activated' : 'deactivated'} ${existingPlayer.full_name}.`,
     detail: existingPlayer.profile_id ? 'Claimed profile' : 'Unclaimed profile',
     actor_player_id: body.player_id,
   });
+  if (activityError) return json({ error: activityError.message }, 500);
 
   return json({ success: true, changed: true, player: updatedPlayer });
 });

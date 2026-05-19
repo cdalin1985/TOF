@@ -276,10 +276,18 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setLoading(false); resetAction(); return; }
+    const challengerWon = winnerId === c.challenger_id;
     await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-dispute`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({ match_id: c.match_id, winner_id: winnerId, final_score_player1: 0, final_score_player2: 0, notes: 'Admin forfeit' }),
+      body: JSON.stringify({
+        match_id: c.match_id,
+        winner_id: winnerId,
+        final_score_player1: challengerWon ? c.race_length : 0,
+        final_score_player2: challengerWon ? 0 : c.race_length,
+        notes: 'Admin forfeit',
+        force_complete: true,
+      }),
     });
     await supabase.from('challenges').update({ status: 'forfeited' }).eq('id', c.id);
     qc.invalidateQueries({ queryKey: ['admin-active-challenges'] });
@@ -440,7 +448,7 @@ function MatchesAdminTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-dispute`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({ match_id: matchId, winner_id: winnerId, final_score_player1: parseInt(p1Score) || 0, final_score_player2: parseInt(p2Score) || 0, notes }),
+      body: JSON.stringify({ match_id: matchId, winner_id: winnerId, final_score_player1: parseInt(p1Score) || 0, final_score_player2: parseInt(p2Score) || 0, notes, force_complete: true }),
     });
     setLoading(false);
     setResolving(null);

@@ -136,10 +136,12 @@ export default function RankingsPage() {
     let list = rankings;
     if (search) list = list.filter((r) => r.player.full_name.toLowerCase().includes(search.toLowerCase()));
     if (tab === 'near' && myPosition !== null) {
-      list = list.filter((r) => Math.abs(r.ranking.position - myPosition) <= 5 && r.player.id !== player?.id);
+      list = list.filter((r) =>
+        canChallenge(myPosition, r.ranking.position, isFirstChallenge) && r.player.id !== player?.id
+      );
     }
     return list;
-  }, [rankings, search, tab, myPosition, player?.id]);
+  }, [rankings, search, tab, myPosition, isFirstChallenge, player?.id]);
 
   return (
     <div className="min-h-screen px-4 pt-8 pb-4">

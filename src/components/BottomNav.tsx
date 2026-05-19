@@ -96,7 +96,7 @@ export const BottomNav: React.FC<{ unreadCount: number }> = ({ unreadCount }) =>
                   <Icon size={22} />
                 </div>
               </div>
-              <span className="text-[10px] text-[#666] mt-1.5 font-[Teko] tracking-widest uppercase">
+              <span className="text-[10px] text-[#666] mt-1.5 font-[Bebas_Neue] tracking-widest uppercase">
                 {item.label}
               </span>
             </motion.button>
@@ -151,7 +151,7 @@ export const BottomNav: React.FC<{ unreadCount: number }> = ({ unreadCount }) =>
             </div>
 
             <span
-              className="font-[Teko] tracking-widest uppercase leading-none"
+              className="font-[Bebas_Neue] tracking-widest uppercase leading-none"
               style={{ fontSize: '10px', color: active ? '#EF5350' : '#555' }}
             >
               {item.label}

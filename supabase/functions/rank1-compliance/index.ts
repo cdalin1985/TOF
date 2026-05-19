@@ -96,7 +96,7 @@ serve(async (req) => {
     const compliant = matchCount >= REQUIRED_TOP5_MATCHES;
     const overdue = daysElapsed >= OBLIGATION_DAYS;
 
-    if (enforce && !compliant) {
+    if (enforce && overdue && !compliant) {
       const { data: targetRank, error } = await supabase.rpc('apply_rank1_penalty', { p_player_id: rank1.player_id });
       if (error) return json({ error: error.message }, 500);
 
