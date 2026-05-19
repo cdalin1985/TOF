@@ -11,6 +11,8 @@ const corsHeaders = {
 const DISCIPLINES = ['8 Ball', '9 Ball', '10 Ball'] as const;
 type Discipline = typeof DISCIPLINES[number];
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function json(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -37,6 +39,15 @@ function normalizeName(value: unknown): string | null {
 
 function normalizedNameKey(name: string): string {
   return name.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+}
+
+function normalizeEmail(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const email = value.trim().toLowerCase();
+  if (email === '') return null;
+  if (email.length > 254) return null;
+  if (!EMAIL_RE.test(email)) return null;
+  return email;
 }
 
 function isValidDiscipline(value: unknown): value is Discipline {
@@ -93,6 +104,71 @@ async function insertRankingAtBottom(supabase: any, playerId: string): Promise<n
   throw new Error(`Could not create ranking: ${lastError?.message ?? 'unknown error'}`);
 }
 
+// Walks auth.admin.listUsers pages until it finds the email or runs out.
+// TOC's player base is small (~hundreds at most), so paging is fine.
+async function findAuthUserByEmail(supabase: any, email: string): Promise<{ id: string; email: string } | null> {
+  const perPage = 200;
+  for (let page = 1; page <= 50; page += 1) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
+    if (error) throw new Error(`Could not list auth users: ${error.message}`);
+    const users = data?.users ?? [];
+    const hit = users.find((u: any) => (u.email ?? '').toLowerCase() === email);
+    if (hit) return { id: hit.id, email: hit.email };
+    if (users.length < perPage) return null;
+  }
+  return null;
+}
+
+type InviteResult = {
+  authUserId: string;
+  inviteSent: boolean;
+  alreadyExisted: boolean;
+};
+
+// Sends a Supabase invite for `email`. If the auth user already exists,
+// falls back to looking them up and treating it as a link-only path.
+// Caller is responsible for linking players.profile_id and ensuring the
+// player isn't already claimed by someone else.
+async function sendInviteOrLookupExisting(
+  supabase: any,
+  email: string,
+  redirectTo: string | undefined,
+): Promise<InviteResult> {
+  const inviteOpts = redirectTo ? { redirectTo } : undefined;
+  const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, inviteOpts);
+
+  if (!error && data?.user?.id) {
+    return { authUserId: data.user.id, inviteSent: true, alreadyExisted: false };
+  }
+
+  // Detect "already exists" — Supabase returns this with various wording across versions.
+  const msg = (error?.message ?? '').toLowerCase();
+  const code = ((error as any)?.code ?? '').toLowerCase();
+  const isExists =
+    code === 'email_exists' ||
+    code === 'user_already_exists' ||
+    msg.includes('already') ||
+    msg.includes('registered') ||
+    msg.includes('exists');
+
+  if (!error) {
+    throw new Error('Invite returned no user and no error — unexpected response from auth.');
+  }
+
+  if (!isExists) {
+    throw new Error(`Could not send invite: ${error.message}`);
+  }
+
+  const found = await findAuthUserByEmail(supabase, email);
+  if (!found) {
+    throw new Error(
+      'Supabase reports this email already exists, but no matching auth user was found. ' +
+      'Check the Authentication → Users dashboard.',
+    );
+  }
+  return { authUserId: found.id, inviteSent: false, alreadyExisted: true };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed.' }, 405);
@@ -132,18 +208,23 @@ serve(async (req) => {
     return json({ error: 'Invalid JSON body.' }, 400);
   }
 
-  const fullName = normalizeName(body.full_name);
-  if (!fullName) {
-    return json({ error: 'Full name is required and must be 2-80 printable characters.' }, 400);
+  const targetPlayerIdInput = typeof body.player_id === 'string' && body.player_id.trim() !== ''
+    ? body.player_id.trim()
+    : null;
+  const emailProvided = body.email !== undefined && body.email !== null && String(body.email).trim() !== '';
+  const email = emailProvided ? normalizeEmail(body.email) : null;
+  if (emailProvided && !email) {
+    return json({ error: 'Email must be a valid address.' }, 400);
   }
 
-  const preferredDiscipline = body.preferred_discipline === undefined || body.preferred_discipline === null || body.preferred_discipline === ''
-    ? null
-    : body.preferred_discipline;
-
-  if (preferredDiscipline !== null && !isValidDiscipline(preferredDiscipline)) {
+  const preferredDisciplineRaw =
+    body.preferred_discipline === undefined || body.preferred_discipline === null || body.preferred_discipline === ''
+      ? null
+      : body.preferred_discipline;
+  if (preferredDisciplineRaw !== null && !isValidDiscipline(preferredDisciplineRaw)) {
     return json({ error: 'Preferred discipline must be 8 Ball, 9 Ball, or 10 Ball.' }, 400);
   }
+  const preferredDiscipline = preferredDisciplineRaw;
 
   const fargoRating = optionalNonNegativeInteger(body.fargo_rating);
   const fargoRobustness = optionalNonNegativeInteger(body.fargo_robustness);
@@ -152,6 +233,100 @@ serve(async (req) => {
   }
   if (body.fargo_robustness !== undefined && body.fargo_robustness !== null && body.fargo_robustness !== '' && fargoRobustness === null) {
     return json({ error: 'Fargo robustness must be a non-negative whole number.' }, 400);
+  }
+
+  // Branch: invite an existing unclaimed player, or create+optionally invite a new one.
+  if (targetPlayerIdInput) {
+    if (!email) {
+      return json({ error: 'Email is required when inviting an existing player.' }, 400);
+    }
+
+    const { data: existingPlayer, error: existingError } = await supabase
+      .from('players')
+      .select('id, full_name, profile_id, is_active')
+      .eq('id', targetPlayerIdInput)
+      .single();
+
+    if (existingError || !existingPlayer) return json({ error: 'Player not found.' }, 404);
+
+    let invite: InviteResult;
+    try {
+      const origin = req.headers.get('origin') ?? Deno.env.get('SITE_URL') ?? '';
+      const redirectTo = origin ? `${origin.replace(/\/$/, '')}/auth/callback` : undefined;
+      invite = await sendInviteOrLookupExisting(supabase, email, redirectTo);
+    } catch (error) {
+      console.error('[add-player invite-existing]', error);
+      return json({ error: error instanceof Error ? error.message : 'Could not send invite.' }, 500);
+    }
+
+    if (existingPlayer.profile_id && existingPlayer.profile_id !== invite.authUserId) {
+      return json({
+        error: 'This player is already linked to a different account.',
+      }, 409);
+    }
+
+    // Ensure no other player is already claimed by this auth user.
+    const { data: otherClaim } = await supabase
+      .from('players')
+      .select('id, full_name')
+      .eq('profile_id', invite.authUserId)
+      .neq('id', existingPlayer.id)
+      .maybeSingle();
+    if (otherClaim) {
+      return json({
+        error: `That email is already linked to player "${otherClaim.full_name}".`,
+      }, 409);
+    }
+
+    if (!existingPlayer.profile_id) {
+      const { error: linkError } = await supabase
+        .from('players')
+        .update({ profile_id: invite.authUserId })
+        .eq('id', existingPlayer.id);
+      if (linkError) {
+        return json({ error: `Could not link player to invited account: ${linkError.message}` }, 500);
+      }
+    }
+
+    await supabase.from('audit_events').insert({
+      actor_profile_id: actorProfile.id,
+      action: 'player.invited',
+      target_type: 'player',
+      target_id: existingPlayer.id,
+      detail: {
+        full_name: existingPlayer.full_name,
+        email,
+        invite_sent: invite.inviteSent,
+        invited_existing_account: invite.alreadyExisted,
+        flow: 'invite_existing',
+      },
+    });
+
+    await supabase.from('activity_feed').insert({
+      event_type: 'player_invited',
+      headline: invite.inviteSent
+        ? `Admin invited ${existingPlayer.full_name} to claim their profile.`
+        : `Admin linked ${existingPlayer.full_name} to an existing account.`,
+      detail: invite.alreadyExisted ? 'Account already existed — linked without new invite.' : null,
+      actor_player_id: existingPlayer.id,
+    });
+
+    return json({
+      success: true,
+      player: { ...existingPlayer, profile_id: invite.authUserId, claimed_profile_status: 'claimed' },
+      email,
+      invite_sent: invite.inviteSent,
+      invited_existing_account: invite.alreadyExisted,
+      message: invite.inviteSent
+        ? `Invite sent to ${email}.`
+        : `Player linked to existing account for ${email}. They can sign in with their email.`,
+    });
+  }
+
+  // --- Create-new-player path (with optional invite) ---
+  const fullName = normalizeName(body.full_name);
+  if (!fullName) {
+    return json({ error: 'Full name is required and must be 2-80 printable characters.' }, 400);
   }
 
   const { data: existingPlayers, error: existingError } = await supabase
@@ -239,22 +414,56 @@ serve(async (req) => {
     );
     if (disciplineStatsError) throw new Error(`Could not create discipline stats: ${disciplineStatsError.message}`);
 
+    let invite: InviteResult | null = null;
+    if (email) {
+      const origin = req.headers.get('origin') ?? Deno.env.get('SITE_URL') ?? '';
+      const redirectTo = origin ? `${origin.replace(/\/$/, '')}/auth/callback` : undefined;
+      invite = await sendInviteOrLookupExisting(supabase, email, redirectTo);
+
+      // Make sure the invited account isn't already claimed by another player.
+      const { data: otherClaim } = await supabase
+        .from('players')
+        .select('id, full_name')
+        .eq('profile_id', invite.authUserId)
+        .neq('id', player.id)
+        .maybeSingle();
+      if (otherClaim) {
+        throw new Error(`That email is already linked to player "${otherClaim.full_name}".`);
+      }
+
+      const { error: linkError } = await supabase
+        .from('players')
+        .update({ profile_id: invite.authUserId })
+        .eq('id', player.id);
+      if (linkError) throw new Error(`Could not link new player to invited account: ${linkError.message}`);
+    }
+
     await supabase.from('audit_events').insert({
       actor_profile_id: actorProfile.id,
-      action: 'player.added',
+      action: invite ? 'player.invited' : 'player.added',
       target_type: 'player',
       target_id: player.id,
       detail: {
         full_name: fullName,
         ranking_position: rankingPosition,
-        claimed_profile_status: 'unclaimed',
+        email: email ?? null,
+        invite_sent: invite?.inviteSent ?? false,
+        invited_existing_account: invite?.alreadyExisted ?? false,
+        flow: invite ? 'create_and_invite' : 'create_only',
+        claimed_profile_status: invite ? 'claimed' : 'unclaimed',
       },
     });
 
     await supabase.from('activity_feed').insert({
-      event_type: 'player_added',
-      headline: `Admin added ${fullName} to the league at #${rankingPosition}.`,
-      detail: fargoRating != null ? `Fargo rating ${fargoRating} · unclaimed profile` : 'Unclaimed profile',
+      event_type: invite ? 'player_invited' : 'player_added',
+      headline: invite
+        ? `Admin added ${fullName} at #${rankingPosition} and sent an invite.`
+        : `Admin added ${fullName} to the league at #${rankingPosition}.`,
+      detail: invite
+        ? (invite.alreadyExisted
+          ? `Linked to existing account for ${email}.`
+          : `Invite sent to ${email}.`)
+        : (fargoRating != null ? `Fargo rating ${fargoRating} · unclaimed profile` : 'Unclaimed profile'),
       actor_player_id: player.id,
     });
 
@@ -262,10 +471,17 @@ serve(async (req) => {
       success: true,
       player: {
         ...player,
-        claimed_profile_status: 'unclaimed',
+        profile_id: invite?.authUserId ?? null,
+        claimed_profile_status: invite ? 'claimed' : 'unclaimed',
         claimed_profile: null,
       },
       ranking_position: rankingPosition,
+      email: email ?? null,
+      invite_sent: invite?.inviteSent ?? false,
+      invited_existing_account: invite?.alreadyExisted ?? false,
+      message: invite
+        ? (invite.inviteSent ? `Invite sent to ${email}.` : `Player linked to existing account for ${email}.`)
+        : undefined,
     }, 201);
   } catch (error) {
     if (createdPlayer?.id) await rollbackCreatedPlayer(supabase, createdPlayer.id);

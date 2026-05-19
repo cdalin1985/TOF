@@ -674,10 +674,17 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const [adding, setAdding]         = useState(false);
   const [newName, setNewName]       = useState('');
   const [newFargo, setNewFargo]     = useState('');
+  const [newEmail, setNewEmail]     = useState('');
   const [addLoading, setAddLoading] = useState(false);
   const [addError, setAddError]     = useState('');
+  const [addBanner, setAddBanner]   = useState('');
   const [activeToggling, setActiveToggling] = useState<string | null>(null);
   const [activeError, setActiveError] = useState('');
+  const [invitingId, setInvitingId]   = useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteError, setInviteError] = useState('');
+  const [inviteBanner, setInviteBanner] = useState('');
 
   const toggleActive = async (p: Player) => {
     setActiveToggling(p.id);
@@ -713,10 +720,11 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     if (!newName.trim()) return;
     setAddLoading(true);
     setAddError('');
+    setAddBanner('');
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setAddError('Session expired — please log in again.'); setAddLoading(false); return; }
 
-    const payload: { full_name: string; fargo_rating?: number } = { full_name: newName.trim() };
+    const payload: { full_name: string; fargo_rating?: number; email?: string } = { full_name: newName.trim() };
     const trimmedFargo = newFargo.trim();
     if (trimmedFargo !== '') {
       if (!/^\d+$/.test(trimmedFargo)) {
@@ -732,6 +740,15 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
       }
       payload.fargo_rating = numeric;
     }
+    const trimmedEmail = newEmail.trim();
+    if (trimmedEmail !== '') {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+        setAddError('Email must be a valid address.');
+        setAddLoading(false);
+        return;
+      }
+      payload.email = trimmedEmail;
+    }
 
     const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/add-player`, {
       method: 'POST',
@@ -741,12 +758,48 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     const json = await res.json();
     setAddLoading(false);
     if (json.error) { setAddError(json.error); return; }
+    setAddBanner(json.message ?? `Added ${newName.trim()} at #${json.ranking_position}.`);
     setNewName('');
     setNewFargo('');
+    setNewEmail('');
     setAdding(false);
     qc.invalidateQueries({ queryKey: ['admin-players'] });
     qc.invalidateQueries({ queryKey: ['admin-player-metrics'] });
     qc.invalidateQueries({ queryKey: ['rankings'] });
+    qc.invalidateQueries({ queryKey: ['audit-events'] });
+    qc.invalidateQueries({ queryKey: ['activity-feed-full'] });
+  };
+
+  const handleInvite = async (player: Player) => {
+    const trimmedEmail = inviteEmail.trim();
+    if (!trimmedEmail) { setInviteError('Email is required.'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setInviteError('Email must be a valid address.');
+      return;
+    }
+    setInviteLoading(true);
+    setInviteError('');
+    setInviteBanner('');
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setInviteError('Session expired — please log in again.'); setInviteLoading(false); return; }
+
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/add-player`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ player_id: player.id, email: trimmedEmail }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setInviteLoading(false);
+    if (!res.ok || json.error) {
+      setInviteError(json.error ?? 'Could not send invite.');
+      return;
+    }
+    setInviteBanner(json.message ?? `Invite sent to ${trimmedEmail}.`);
+    setInvitingId(null);
+    setInviteEmail('');
+    qc.invalidateQueries({ queryKey: ['admin-players'] });
+    qc.invalidateQueries({ queryKey: ['audit-events'] });
+    qc.invalidateQueries({ queryKey: ['activity-feed-full'] });
   };
 
 
@@ -760,11 +813,19 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
             className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] mb-2" />
           <input type="number" min={0} step={1} inputMode="numeric" value={newFargo} onChange={(e) => setNewFargo(e.target.value)} placeholder="Fargo rating (optional)"
             onKeyDown={(e) => e.key === 'Enter' && handleAddPlayer()}
-            className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] mb-3" />
+            className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] mb-2" />
+          <input type="email" inputMode="email" autoComplete="off" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="Email (optional — sends invite)"
+            onKeyDown={(e) => e.key === 'Enter' && handleAddPlayer()}
+            className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] mb-1" />
+          <p className="text-[#6B7280] text-xs font-[Barlow] mb-3">
+            Leave blank to add as unclaimed. With email, an invite is sent immediately.
+          </p>
           {addError && <p className="text-[#EF4444] text-xs font-[Barlow] mb-2">{addError}</p>}
           <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={() => { setAdding(false); setNewName(''); setNewFargo(''); setAddError(''); }}>Cancel</Button>
-            <Button variant="primary" size="sm" loading={addLoading} disabled={!newName.trim()} onClick={handleAddPlayer}>Add Player</Button>
+            <Button variant="ghost" size="sm" onClick={() => { setAdding(false); setNewName(''); setNewFargo(''); setNewEmail(''); setAddError(''); }}>Cancel</Button>
+            <Button variant="primary" size="sm" loading={addLoading} disabled={!newName.trim()} onClick={handleAddPlayer}>
+              {newEmail.trim() !== '' ? 'Add & Invite' : 'Add Player'}
+            </Button>
           </div>
         </GlassCard>
       ) : (
@@ -773,6 +834,8 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
         </Button>
       )}
 
+      {addBanner && <p className="text-[#22C55E] text-xs font-[Barlow]">{addBanner}</p>}
+      {inviteBanner && <p className="text-[#22C55E] text-xs font-[Barlow]">{inviteBanner}</p>}
       {activeError && <p className="text-[#EF4444] text-xs font-[Barlow]">{activeError}</p>}
 
       {/* Filter buttons */}
@@ -788,21 +851,50 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
       <p className="text-[#9CA3AF] text-xs font-[Barlow]">{filteredPlayers.length} {filter === 'all' ? 'total' : filter} players</p>
       {filteredPlayers.map((p) => {
         const fr = fargoByPlayer.get(p.id);
+        const isInviting = invitingId === p.id;
         return (
-          <GlassCard key={p.id} className="p-3 flex items-center gap-3">
-            <div className="flex-1 min-w-0">
-              <div className={`font-[Barlow] font-semibold text-sm truncate ${p.is_active ? 'text-[#E8E2D6]' : 'text-[#6B7280] line-through'}`}>
-                {p.full_name}
-                {typeof fr === 'number' && (
-                  <span className="ml-2 text-[#9CA3AF] font-normal">FR {fr}</span>
-                )}
+          <GlassCard key={p.id} className="p-3">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <div className={`font-[Barlow] font-semibold text-sm truncate ${p.is_active ? 'text-[#E8E2D6]' : 'text-[#6B7280] line-through'}`}>
+                  {p.full_name}
+                  {typeof fr === 'number' && (
+                    <span className="ml-2 text-[#9CA3AF] font-normal">FR {fr}</span>
+                  )}
+                </div>
+                <div className="text-[#6B7280] text-xs font-[Barlow]">{p.profile_id ? 'Claimed' : 'Unclaimed'}</div>
               </div>
-              <div className="text-[#6B7280] text-xs font-[Barlow]">{p.profile_id ? 'Claimed' : 'Unclaimed'}</div>
+              {!p.profile_id && !isInviting && (
+                <button
+                  onClick={() => { setInvitingId(p.id); setInviteEmail(''); setInviteError(''); setInviteBanner(''); }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-[Barlow] font-medium transition-colors bg-[#3B82F6]/20 text-[#3B82F6] border border-[#3B82F6]/30">
+                  Invite
+                </button>
+              )}
+              <button onClick={() => toggleActive(p)} disabled={activeToggling === p.id}
+                className={`px-3 py-1.5 rounded-lg text-xs font-[Barlow] font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${p.is_active ? 'bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/30' : 'bg-[#22C55E]/20 text-[#22C55E] border border-[#22C55E]/30'}`}>
+                {activeToggling === p.id ? 'Saving…' : p.is_active ? 'Deactivate' : 'Activate'}
+              </button>
             </div>
-            <button onClick={() => toggleActive(p)} disabled={activeToggling === p.id}
-              className={`px-3 py-1.5 rounded-lg text-xs font-[Barlow] font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${p.is_active ? 'bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/30' : 'bg-[#22C55E]/20 text-[#22C55E] border border-[#22C55E]/30'}`}>
-              {activeToggling === p.id ? 'Saving…' : p.is_active ? 'Deactivate' : 'Activate'}
-            </button>
+            {isInviting && (
+              <div className="mt-3 space-y-2">
+                <input
+                  type="email"
+                  inputMode="email"
+                  autoFocus
+                  value={inviteEmail}
+                  onChange={(e) => { setInviteEmail(e.target.value); setInviteError(''); }}
+                  onKeyDown={(e) => e.key === 'Enter' && handleInvite(p)}
+                  placeholder={`Email for ${p.full_name}`}
+                  className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
+                />
+                {inviteError && <p className="text-[#EF4444] text-xs font-[Barlow]">{inviteError}</p>}
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => { setInvitingId(null); setInviteEmail(''); setInviteError(''); }}>Cancel</Button>
+                  <Button variant="primary" size="sm" loading={inviteLoading} disabled={!inviteEmail.trim()} onClick={() => handleInvite(p)}>Send Invite</Button>
+                </div>
+              </div>
+            )}
           </GlassCard>
         );
       })}
