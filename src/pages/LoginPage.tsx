@@ -91,11 +91,15 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <motion.div
-            animate={{ y: [0, -8, 0] }}
+            animate={{ y: [0, -6, 0] }}
             transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-            className="text-6xl mb-4"
+            className="mb-4 flex justify-center"
           >
-            🎱
+            <img
+              src="/toclogo.png"
+              alt="Top of the Capital"
+              className="h-28 w-auto object-contain"
+            />
           </motion.div>
           <h1
             className="font-[Bebas_Neue] text-6xl tracking-widest leading-none"
