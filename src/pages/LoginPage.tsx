@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { EKGLine } from '../components/EKGLine';
 import { Button } from '../components/Button';
+import { LEAGUE } from '../config/league';
 
 type Step = 'email' | 'code';
 
@@ -78,7 +79,7 @@ export default function LoginPage() {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'radial-gradient(ellipse at 50% 60%, rgba(198,40,40,0.12) 0%, transparent 65%)',
+          background: 'radial-gradient(ellipse at 50% 60%, var(--toc-theme-glow-soft) 0%, transparent 65%)',
         }}
       />
 
@@ -93,25 +94,25 @@ export default function LoginPage() {
           <motion.div
             animate={{ y: [0, -6, 0] }}
             transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-            className="mb-4 flex justify-center"
+            className="text-6xl mb-4 flex justify-center"
           >
-            <img
-              src="/toclogo.png"
-              alt="Top of the Capital"
-              className="h-28 w-auto object-contain"
-            />
+            🎱
           </motion.div>
           <h1
             className="font-[Bebas_Neue] text-6xl tracking-widest leading-none"
             style={{
               color: '#E8E2D6',
-              textShadow: '0 0 40px rgba(198,40,40,0.4), 0 2px 8px rgba(0,0,0,0.6)',
+              textShadow: '0 0 40px var(--toc-theme-glow), 0 2px 8px rgba(0,0,0,0.6)',
             }}
           >
-            TOP OF THE<br />CAPITAL
+            {LEAGUE.name.toUpperCase().includes('TOP OF THE') ? (
+              <>TOP OF THE<br />{LEAGUE.name.toUpperCase().replace('TOP OF THE', '').trim()}</>
+            ) : (
+              <>{LEAGUE.name.toUpperCase()}</>
+            )}
           </h1>
           <p className="text-[#9CA3AF] font-[Barlow] text-sm mt-2 tracking-[0.2em] uppercase">
-            Helena Pool League
+            {LEAGUE.tagline}
           </p>
           <EKGLine className="mx-auto mt-3" />
           {/* Tagline gives first-time visitors a one-line answer to "what is this?" */}
@@ -151,7 +152,7 @@ export default function LoginPage() {
                     onChange={(e) => { setEmail(e.target.value); setError(''); }}
                     placeholder="your@email.com"
                     autoFocus={SHOULD_AUTO_FOCUS_EMAIL}
-                    className="w-full pl-10 pr-4 py-3 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-base placeholder-[#6B7280] focus:outline-none focus:border-[#C62828] focus:ring-1 focus:ring-[#C62828]/30 transition-colors"
+                    className="w-full pl-10 pr-4 py-3 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-base placeholder-[#6B7280] focus:outline-none focus:border-[var(--toc-theme-accent)] focus:ring-1 focus:ring-[var(--toc-theme-glow-soft)] transition-colors"
                   />
                 </div>
                 {error && (
@@ -230,7 +231,7 @@ export default function LoginPage() {
                   onChange={(e) => handleCodeChange(e.target.value)}
                   placeholder="00000000"
                   maxLength={8}
-                  className="w-full px-4 py-4 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Azeret_Mono] text-3xl text-center tracking-[0.5em] placeholder-[#3A3A3A] focus:outline-none focus:border-[#C62828] focus:ring-1 focus:ring-[#C62828]/30 transition-colors"
+                  className="w-full px-4 py-4 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Azeret_Mono] text-3xl text-center tracking-[0.5em] placeholder-[#3A3A3A] focus:outline-none focus:border-[var(--toc-theme-accent)] focus:ring-1 focus:ring-[var(--toc-theme-glow-soft)] transition-colors"
                 />
                 {error && (
                   <motion.p
@@ -275,7 +276,7 @@ export default function LoginPage() {
             need an escape hatch — there was no contact path before. */}
         <div className="mt-5 text-center">
           <a
-            href="mailto:help@toc.monster?subject=TOC%20sign-in%20help"
+            href={`mailto:help@topofthefalls.com?subject=${encodeURIComponent(LEAGUE.shortName)}%20sign-in%20help`}
             className="inline-flex items-center gap-1.5 text-[#71717A] hover:text-[#A1A1AA] text-sm font-[Barlow] transition-colors"
           >
             <HelpCircle size={14} /> Trouble signing in?

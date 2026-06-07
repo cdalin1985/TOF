@@ -16,7 +16,7 @@ const Particle: React.FC<{ data: ParticleData }> = ({ data }) => (
       height: '2px',
       left: data.left,
       bottom: data.bottom,
-      background: data.isCrimson ? 'rgba(198,40,40,0.9)' : 'rgba(255,255,255,0.75)',
+      background: data.isCrimson ? 'var(--toc-theme-accent)' : 'rgba(255,255,255,0.75)',
       opacity: 0,
       animationName: 'float-up',
       animationDuration: data.duration,
@@ -72,7 +72,7 @@ export const AmbientBackground: React.FC = () => {
           left: '-12%',
           width: '620px',
           height: '620px',
-          background: 'radial-gradient(circle, rgba(198,40,40,0.13) 0%, transparent 65%)',
+          background: 'radial-gradient(circle, var(--toc-theme-glow-soft) 0%, transparent 65%)',
           filter: 'blur(90px)',
           animation: 'drift1 22s ease-in-out infinite',
         }}
@@ -100,7 +100,7 @@ export const AmbientBackground: React.FC = () => {
           right: '5%',
           width: '380px',
           height: '380px',
-          background: 'radial-gradient(circle, rgba(198,40,40,0.055) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, var(--toc-theme-glow-soft) 0%, transparent 70%)',
           filter: 'blur(80px)',
           animation: 'drift3 18s ease-in-out infinite',
         }}

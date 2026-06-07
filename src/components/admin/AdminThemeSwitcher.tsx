@@ -12,6 +12,12 @@ const OPTIONS: Array<{
   previewClass: string;
 }> = [
   {
+    value: 'emerald-forest',
+    label: 'Emerald Forest (Default)',
+    description: 'The green and gold Top of the Falls brand style. Custom crafted for Great Falls, MT.',
+    previewClass: 'toc-theme-preview toc-theme-preview--emerald-forest',
+  },
+  {
     value: 'classic',
     label: 'Current Classic',
     description: 'The existing live TOC look. Dark, matte, red-accented, and safe as the default fallback.',

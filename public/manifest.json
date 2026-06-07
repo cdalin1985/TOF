@@ -1,11 +1,11 @@
 {
-  "name": "Top of the Capital",
-  "short_name": "TOC",
-  "description": "Helena Pool League — Competitive rankings and challenges",
+  "name": "Top of the Falls",
+  "short_name": "TOTF",
+  "description": "Great Falls Pool Challenge List — Competitive rankings and challenges",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0D0D0D",
-  "theme_color": "#C62828",
+  "theme_color": "#16A34A",
   "orientation": "portrait",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },

@@ -78,19 +78,19 @@ export const BottomNav: React.FC<{ unreadCount: number }> = ({ unreadCount }) =>
               <div className="relative">
                 {/* Expanding rings — double phase */}
                 <div
-                  className="absolute inset-0 rounded-full border border-[#C62828]/50"
-                  style={{ animation: 'ring-pulse 2s ease-out infinite' }}
+                  className="absolute inset-0 rounded-full border"
+                  style={{ animation: 'ring-pulse 2s ease-out infinite', borderColor: 'var(--toc-theme-glow)' }}
                 />
                 <div
-                  className="absolute inset-0 rounded-full border border-[#C62828]/30"
-                  style={{ animation: 'ring-pulse 2s ease-out infinite', animationDelay: '1s' }}
+                  className="absolute inset-0 rounded-full border"
+                  style={{ animation: 'ring-pulse 2s ease-out infinite', animationDelay: '1s', borderColor: 'var(--toc-theme-glow-soft)' }}
                 />
                 {/* Button */}
                 <div
                   className="w-[58px] h-[58px] rounded-full flex items-center justify-center relative z-10"
                   style={{
-                    background: 'linear-gradient(145deg, #EF5350 0%, #C62828 50%, #7F0000 100%)',
-                    boxShadow: '0 0 0 3px rgba(10,8,8,0.94), 0 6px 28px rgba(198,40,40,0.65), inset 0 1px 0 rgba(255,255,255,0.18)',
+                    background: 'linear-gradient(145deg, var(--toc-theme-accent-2) 0%, var(--toc-theme-accent) 100%)',
+                    boxShadow: '0 0 0 3px rgba(10,8,8,0.94), 0 6px 28px var(--toc-theme-glow), inset 0 1px 0 rgba(255,255,255,0.18)',
                   }}
                 >
                   <Icon size={22} />
@@ -116,7 +116,7 @@ export const BottomNav: React.FC<{ unreadCount: number }> = ({ unreadCount }) =>
               <motion.div
                 layoutId="nav-active-bg"
                 className="absolute inset-0 rounded-xl"
-                style={{ background: 'rgba(198,40,40,0.1)' }}
+                style={{ background: 'var(--toc-theme-glow-soft)' }}
                 transition={{ type: 'spring', stiffness: 380, damping: 30 }}
               />
             )}
@@ -129,7 +129,7 @@ export const BottomNav: React.FC<{ unreadCount: number }> = ({ unreadCount }) =>
                 <Icon
                   size={22}
                   weight={weight}
-                  style={{ color: active ? '#EF5350' : '#555' }}
+                  style={{ color: active ? 'var(--toc-theme-accent-2)' : 'var(--toc-theme-muted)' }}
                 />
               </motion.div>
 
@@ -142,7 +142,8 @@ export const BottomNav: React.FC<{ unreadCount: number }> = ({ unreadCount }) =>
                     animate={{ scale: 1 }}
                     exit={{ scale: 0 }}
                     transition={{ type: 'spring', stiffness: 500, damping: 20 }}
-                    className="absolute -top-1.5 -right-2 bg-[#C62828] text-white text-[8px] font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-0.5 font-[Azeret_Mono]"
+                    className="absolute -top-1.5 -right-2 text-white text-[8px] font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-0.5 font-[Azeret_Mono]"
+                    style={{ background: 'var(--toc-theme-danger, #ef4444)' }}
                   >
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </motion.span>
@@ -152,7 +153,7 @@ export const BottomNav: React.FC<{ unreadCount: number }> = ({ unreadCount }) =>
 
             <span
               className="font-[Bebas_Neue] tracking-widest uppercase leading-none"
-              style={{ fontSize: '10px', color: active ? '#EF5350' : '#555' }}
+              style={{ fontSize: '10px', color: active ? 'var(--toc-theme-accent-2)' : 'var(--toc-theme-muted)' }}
             >
               {item.label}
             </span>
@@ -161,7 +162,8 @@ export const BottomNav: React.FC<{ unreadCount: number }> = ({ unreadCount }) =>
             {active && (
               <motion.div
                 layoutId="nav-dot"
-                className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-[#C62828]"
+                className="absolute -bottom-0.5 w-1 h-1 rounded-full"
+                style={{ backgroundColor: 'var(--toc-theme-accent)' }}
                 transition={{ type: 'spring', stiffness: 400, damping: 35 }}
               />
             )}

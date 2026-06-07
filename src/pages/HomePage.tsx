@@ -13,6 +13,7 @@ import { Badge } from '../components/Badge';
 import { Skeleton } from '../components/Skeleton';
 import type { ActivityFeedItem, Match, Notification, Challenge } from '../types/database';
 import { formatDistanceToNow } from '../utils/time';
+import { LEAGUE } from '../config/league';
 
 export default function HomePage() {
   const navigate   = useNavigate();
@@ -118,16 +119,13 @@ export default function HomePage() {
           .select('id', { count: 'exact', head: true })
           .eq('status', 'confirmed')
           .gte('completed_at', rankRow.rank1_since)
-          .or(
-            `and(player1_id.eq.${player.id},player2_id.in.(${top5Ids.join(',')})),` +
-            `and(player2_id.eq.${player.id},player1_id.in.(${top5Ids.join(',')}))`
-          );
+          .in('player1_id', top5Ids)
+          .or(`player2_id.in.(${top5Ids.join(',')})`); // matches where one opponent is top-5
         matchCount = count ?? 0;
       }
       return {
-        daysElapsed: Math.floor(daysSince),
-        daysRemaining: Math.max(0, Math.floor(30 - daysSince)),
         matchCount,
+        daysRemaining: Math.max(0, Math.ceil(30 - daysSince)),
         compliant: matchCount >= 2,
       };
     },
@@ -177,12 +175,12 @@ export default function HomePage() {
               <span className="text-2xl shrink-0">🎱</span>
               <div className="flex-1">
                 <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm mb-1">
-                  Welcome to Top of the Capital!
+                  Welcome to {LEAGUE.name}!
                 </div>
                 <div className="text-[#9CA3AF] text-xs font-[Barlow] space-y-1">
-                  <p>You can challenge any player ranked within <span className="text-[#E8E2D6]">5 spots</span> above you.</p>
-                  <p>Win to move up the ladder. Defend your rank or drop.</p>
-                  <p>Head to <span className="text-[#C62828] font-semibold">The List</span> to find your first opponent.</p>
+                  <p>You can challenge any player ranked within <span className="text-[#E8E2D6]">1 spot up</span> in the Top 11, or <span className="text-[#E8E2D6]">up to 2 spots up</span> in spots 12+.</p>
+                  <p>Accepted matches must be played within <span className="text-[#E8E2D6]">10 days</span>.</p>
+                  <p>All callouts and results must be posted to the <span className="text-[var(--toc-theme-accent-2)] font-semibold">{LEAGUE.name} Facebook page</span> with the player tagged.</p>
                 </div>
               </div>
               <button onClick={dismissWelcome} className="text-[#6B7280] shrink-0 -mt-0.5">
@@ -197,7 +195,8 @@ export default function HomePage() {
       {pendingChallenges.length > 0 && (
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
           <GlassCard
-            className="p-4 border border-[#C62828]/40"
+            className="p-4 border"
+            style={{ borderColor: 'var(--toc-theme-glow)' }}
             hover
             onClick={() => navigate('/challenges')}
           >
@@ -211,7 +210,10 @@ export default function HomePage() {
                 </div>
                 <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-0.5">Tap to respond</div>
               </div>
-              <span className="bg-[#C62828] text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center font-[Azeret_Mono] shrink-0">
+              <span
+                className="text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center font-[Azeret_Mono] shrink-0"
+                style={{ backgroundColor: 'var(--toc-theme-accent)' }}
+              >
                 {pendingChallenges.length}
               </span>
             </div>
@@ -321,7 +323,10 @@ export default function HomePage() {
       {/* Player card */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
         <GlassCard className="p-5 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-[#C62828]/5 rounded-full blur-2xl pointer-events-none" />
+          <div
+            className="absolute top-0 right-0 w-32 h-32 rounded-full blur-2xl pointer-events-none"
+            style={{ backgroundColor: 'var(--toc-theme-glow-soft)' }}
+          />
           <div className="flex items-center gap-4">
             <PoolBall position={myRanking.ranking.position} size={64} />
             <div className="flex-1 min-w-0">
@@ -329,7 +334,7 @@ export default function HomePage() {
                 {profile?.display_name ?? player.full_name}
               </div>
               <div className="flex items-center gap-3 mt-1">
-                <span className="font-[Azeret_Mono] font-bold text-2xl" style={{ color: '#C62828' }}>
+                <span className="font-[Azeret_Mono] font-bold text-2xl" style={{ color: 'var(--toc-theme-accent)' }}>
                   #{myRanking.ranking.position}
                 </span>
                 {myRanking.metrics?.fargo_rating && (
@@ -381,16 +386,16 @@ export default function HomePage() {
           <GlassCard className="p-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6]">
-                Alerts <span className="text-[#C62828]">({notifications.length})</span>
+                Alerts <span style={{ color: 'var(--toc-theme-accent)' }}>({notifications.length})</span>
               </h2>
-              <button onClick={() => navigate('/notifications')} className="text-[#C62828] text-xs font-[Barlow]">
+              <button onClick={() => navigate('/notifications')} className="text-xs font-[Barlow]" style={{ color: 'var(--toc-theme-accent)' }}>
                 View all →
               </button>
             </div>
             <div className="space-y-2">
               {notifications.map((n) => (
                 <div key={n.id} className="flex items-start gap-2 py-2 border-b border-white/5 last:border-0">
-                  <div className="w-2 h-2 rounded-full bg-[#C62828] mt-1.5 shrink-0" />
+                  <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: 'var(--toc-theme-accent)' }} />
                   <div>
                     <div className="text-sm font-[Barlow] font-medium text-[#E8E2D6]">{n.title}</div>
                     <div className="text-xs text-[#9CA3AF] font-[Barlow] mt-0.5">{n.body}</div>
@@ -430,7 +435,7 @@ export default function HomePage() {
               <TrendingUp size={18} className="text-[#9CA3AF]" />
               <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6]">League Activity</h2>
             </div>
-            <button onClick={() => navigate('/activity')} className="text-[#C62828] text-xs font-[Barlow]">
+            <button onClick={() => navigate('/activity')} className="text-xs font-[Barlow]" style={{ color: 'var(--toc-theme-accent)' }}>
               View all →
             </button>
           </div>
