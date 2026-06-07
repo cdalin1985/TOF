@@ -66,7 +66,7 @@ export default function MatchesPage() {
           <button
             key={t.key}
             onClick={() => setTab(t.key as 'active' | 'history')}
-            className={`flex-1 py-2 rounded-lg text-sm font-[Barlow] font-medium transition-all ${tab === t.key ? 'bg-[#C62828] text-white' : 'text-[#9CA3AF]'}`}
+            className={`flex-1 py-2 rounded-lg text-sm font-[Barlow] font-medium transition-all ${tab === t.key ? 'bg-[var(--toc-theme-accent)] text-white' : 'text-[#9CA3AF]'}`}
           >
             {t.label} {t.count > 0 && <span className="ml-1 opacity-70">({t.count})</span>}
           </button>
@@ -82,7 +82,7 @@ export default function MatchesPage() {
               onClick={() => setDisc(d)}
               className={[
                 'px-3 py-1.5 rounded-full text-xs font-[Barlow] font-medium whitespace-nowrap transition-all shrink-0',
-                disc === d ? 'bg-[#C62828] text-white' : 'bg-[#1A1A1A] text-[#9CA3AF] border border-[#333]',
+                disc === d ? 'bg-[var(--toc-theme-accent)] text-white' : 'bg-[#1A1A1A] text-[#9CA3AF] border border-[#333]',
               ].join(' ')}
             >
               {d}

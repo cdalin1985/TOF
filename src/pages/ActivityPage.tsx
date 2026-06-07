@@ -103,7 +103,7 @@ export default function ActivityPage() {
             onClick={() => { setFilter(f.key); setLimit(40); }}
             className={[
               'shrink-0 px-3 py-2 rounded-lg text-xs font-[Barlow] font-medium transition-all duration-200',
-              filter === f.key ? 'bg-[#C62828] text-white' : 'text-[#9CA3AF]',
+              filter === f.key ? 'bg-[var(--toc-theme-accent)] text-white' : 'text-[#9CA3AF]',
             ].join(' ')}
           >
             {f.label}
@@ -156,7 +156,7 @@ export default function ActivityPage() {
             {feed.length >= limit && (
               <button
                 onClick={() => setLimit((l) => l + 40)}
-                className="w-full text-center text-[#C62828] text-sm font-[Barlow] font-medium py-3 mt-2 border border-[#C62828]/30 rounded-xl active:bg-[#C62828]/10 transition-colors"
+                className="w-full text-center text-[var(--toc-theme-accent)] text-sm font-[Barlow] font-medium py-3 mt-2 border border-[var(--toc-theme-accent)]/30 rounded-xl active:bg-[var(--toc-theme-accent)]/10 transition-colors"
               >
                 Load more
               </button>

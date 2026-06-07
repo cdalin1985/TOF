@@ -1,9 +1,10 @@
 import React from 'react';
 
-type BadgeVariant = 'win' | 'loss' | 'pending' | 'gold' | 'default' | 'info';
+type BadgeVariant = 'win' | 'success' | 'loss' | 'pending' | 'gold' | 'default' | 'info';
 
 const BADGE_STYLES: Record<BadgeVariant, string> = {
   win:     'bg-[#22C55E]/15 text-[#22C55E] border border-[#22C55E]/30',
+  success: 'bg-[#22C55E]/15 text-[#22C55E] border border-[#22C55E]/30',
   loss:    'bg-[#EF4444]/15 text-[#EF4444] border border-[#EF4444]/30',
   pending: 'bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30',
   gold:    'bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30',

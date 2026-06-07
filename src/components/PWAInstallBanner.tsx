@@ -46,7 +46,7 @@ export const PWAInstallBanner: React.FC = () => {
           style={{
             background: 'rgba(13,13,13,0.97)',
             backdropFilter: 'blur(12px)',
-            borderBottom: '1px solid rgba(198,40,40,0.25)',
+            borderBottom: '1px solid var(--toc-theme-border-strong)',
           }}
         >
           <div className="max-w-sm mx-auto flex items-center gap-3">
@@ -61,7 +61,8 @@ export const PWAInstallBanner: React.FC = () => {
             </div>
             <button
               onClick={handleInstall}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C62828] text-white text-xs font-[Barlow] font-semibold shrink-0 active:opacity-80"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-[Barlow] font-semibold shrink-0 active:opacity-80"
+              style={{ backgroundColor: 'var(--toc-theme-accent)' }}
             >
               <Download size={12} /> Install
             </button>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { LEAGUE } from '../config/league';
 
 interface LoadingScreenProps {
   visible: boolean;
@@ -21,12 +22,12 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ visible }) => (
           transition={{ duration: 0.6, ease: 'easeOut' }}
           className="text-center relative"
         >
-          {/* Crimson halo behind text */}
+          {/* Theme-adaptive halo behind text */}
           <div
             className="absolute inset-0 flex items-center justify-center pointer-events-none"
             style={{
               filter: 'blur(48px)',
-              background: 'radial-gradient(ellipse at center, rgba(198,40,40,0.35) 0%, transparent 70%)',
+              background: 'radial-gradient(ellipse at center, var(--toc-theme-glow) 0%, transparent 70%)',
             }}
           />
           <div
@@ -34,13 +35,13 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ visible }) => (
             style={{
               color: '#E8E2D6',
               textShadow:
-                '0 0 60px rgba(198,40,40,0.7), 0 0 20px rgba(198,40,40,0.4), 0 2px 0 rgba(0,0,0,0.5)',
+                '0 0 60px var(--toc-theme-glow), 0 0 20px var(--toc-theme-glow-soft), 0 2px 0 rgba(0,0,0,0.5)',
             }}
           >
-            TOC
+            {LEAGUE.shortName}
           </div>
           <div className="text-[#9CA3AF] text-sm font-[Barlow] tracking-[0.35em] mt-1 uppercase">
-            Helena Pool League
+            {LEAGUE.region}
           </div>
         </motion.div>
 
@@ -55,7 +56,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ visible }) => (
             <polyline
               points="0,15 40,15 55,15 65,3 72,27 79,9 86,21 93,15 110,15 200,15"
               fill="none"
-              stroke="#C62828"
+              stroke="var(--toc-theme-accent)"
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"

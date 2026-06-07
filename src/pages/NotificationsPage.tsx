@@ -117,7 +117,7 @@ function RespondInline({
       <select
         value={venue}
         onChange={(e) => setVenue(e.target.value as Venue)}
-        className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
+        className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[var(--toc-theme-accent)]"
       >
         <option value="">Select venue…</option>
         {VENUES.map((v) => <option key={v} value={v}>{v}</option>)}
@@ -128,13 +128,13 @@ function RespondInline({
           value={date}
           onChange={(e) => setDate(e.target.value)}
           min={new Date().toISOString().split('T')[0]}
-          className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
+          className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[var(--toc-theme-accent)]"
         />
         <input
           type="time"
           value={time}
           onChange={(e) => setTime(e.target.value)}
-          className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
+          className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[var(--toc-theme-accent)]"
         />
       </div>
       {error && <p className="text-[#EF4444] text-xs font-[Barlow]">{error}</p>}
@@ -198,13 +198,13 @@ export default function NotificationsPage() {
     <div className="min-h-screen px-4 pt-8 pb-4">
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-2">
-          <Bell size={24} className="text-[#C62828]" />
+          <Bell size={24} className="text-[var(--toc-theme-accent)]" />
           <h1 className="font-[Bebas_Neue] text-5xl tracking-wide text-[#E8E2D6]">Alerts</h1>
           {unread > 0 && (
             <motion.span
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              className="bg-[#C62828] text-white text-xs font-bold rounded-full px-2 py-0.5 font-[Azeret_Mono]"
+              className="bg-[var(--toc-theme-accent)] text-white text-xs font-bold rounded-full px-2 py-0.5 font-[Azeret_Mono]"
             >
               {unread}
             </motion.span>
@@ -213,7 +213,7 @@ export default function NotificationsPage() {
         {unread > 0 && (
           <button
             onClick={markAllRead}
-            className="flex items-center gap-1 text-[#C62828] text-sm font-[Barlow]"
+            className="flex items-center gap-1 text-[var(--toc-theme-accent)] text-sm font-[Barlow]"
           >
             <CheckCheck size={16} /> Mark all read
           </button>
@@ -242,7 +242,7 @@ export default function NotificationsPage() {
                 transition={{ delay: i * 0.03 }}
               >
                 <GlassCard
-                  className={`p-4 ${!n.is_read ? 'border-[#C62828]/20' : ''}`}
+                  className={`p-4 ${!n.is_read ? 'border-[var(--toc-theme-accent)]/20' : ''}`}
                   hover={!isChallengeReceived}
                   onClick={!isChallengeReceived ? () => markRead(n) : undefined}
                 >
@@ -276,7 +276,7 @@ export default function NotificationsPage() {
                       )}
                     </div>
                     {!n.is_read && !isChallengeReceived && !isResultSubmitted && (
-                      <div className="w-2 h-2 rounded-full bg-[#C62828] shrink-0 mt-1" />
+                      <div className="w-2 h-2 rounded-full bg-[var(--toc-theme-accent)] shrink-0 mt-1" />
                     )}
                   </div>
                 </GlassCard>

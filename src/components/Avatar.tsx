@@ -1,6 +1,6 @@
 import React from 'react';
 
-const COLORS = ['#C62828','#1565C0','#2E7D32','#F57F17','#6A1B9A','#00695C','#AD1457','#E65100','#4527A0','#00838F'];
+const COLORS = ['#16A34A','#1565C0','#2E7D32','#F57F17','#6A1B9A','#00695C','#AD1457','#E65100','#4527A0','#00838F'];
 
 function nameToColor(name: string): string {
   let hash = 0;

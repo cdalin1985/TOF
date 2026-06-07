@@ -185,7 +185,7 @@ function TableSideScoreboard({
         </div>
         <div className="h-1.5 bg-[#333] rounded-full overflow-hidden">
           <div
-            className="h-full bg-[#C62828] rounded-full transition-all duration-500"
+            className="h-full bg-[var(--toc-theme-accent)] rounded-full transition-all duration-500"
             style={{ width: `${progressPct}%` }}
           />
         </div>
@@ -618,7 +618,7 @@ export default function MatchPage() {
                           className={[
                             'w-full flex items-center gap-3 p-4 rounded-xl border transition-all text-left',
                             selected
-                              ? 'border-[#C62828] bg-[#C62828]/10'
+                              ? 'border-[var(--toc-theme-accent)] bg-[var(--toc-theme-accent)]/10'
                               : 'border-[#333] bg-[#252525]/50',
                             !available ? 'opacity-55 cursor-not-allowed' : '',
                           ].join(' ')}
@@ -639,7 +639,7 @@ export default function MatchPage() {
                               </a>
                             )}
                           </div>
-                          {selected && <CheckCircle size={20} className="text-[#C62828]" />}
+                          {selected && <CheckCircle size={20} className="text-[var(--toc-theme-accent)]" />}
                         </button>
                       );
                     })}

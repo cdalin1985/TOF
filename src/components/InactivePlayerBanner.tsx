@@ -8,8 +8,8 @@ export const InactivePlayerBanner: React.FC<InactivePlayerBannerProps> = ({ play
   return (
     <div
       style={{
-        background: 'rgba(198, 40, 40, 0.15)',
-        border: '1px solid #C62828',
+        background: 'rgba(245, 158, 11, 0.12)',
+        border: '1px solid rgba(245, 158, 11, 0.45)',
         borderRadius: '8px',
         padding: '12px 16px',
         display: 'flex',
@@ -20,7 +20,7 @@ export const InactivePlayerBanner: React.FC<InactivePlayerBannerProps> = ({ play
     >
       <span style={{ fontSize: '20px' }}>⚠️</span>
       <div>
-        <div style={{ color: '#ff6b6b', fontWeight: 700, fontSize: '14px', letterSpacing: '0.5px' }}>
+        <div style={{ color: '#F59E0B', fontWeight: 700, fontSize: '14px', letterSpacing: '0.5px' }}>
           PLAYER INACTIVE
         </div>
         <div style={{ color: '#ccc', fontSize: '13px', marginTop: '2px' }}>

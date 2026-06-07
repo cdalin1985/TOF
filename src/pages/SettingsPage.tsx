@@ -123,7 +123,7 @@ export default function SettingsPage() {
                 <Avatar player={player} size={64} />
                 <button
                   onClick={() => setShowIconPicker(!showIconPicker)}
-                  className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#C62828] flex items-center justify-center border-2 border-[#0D0D0D]"
+                  className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[var(--toc-theme-accent)] flex items-center justify-center border-2 border-[#0D0D0D]"
                 >
                   <Camera size={11} className="text-white" />
                 </button>
@@ -131,7 +131,7 @@ export default function SettingsPage() {
               <div>
                 <div className="font-[Bebas_Neue] text-2xl text-[#E8E2D6]">{player.full_name}</div>
                 <div className="text-[#9CA3AF] text-sm font-[Barlow]">{profile?.email}</div>
-                <div className="text-[#C62828] font-[Azeret_Mono] text-sm">
+                <div className="text-[var(--toc-theme-accent)] font-[Azeret_Mono] text-sm">
                   Rank #{myRanking.ranking.position}
                 </div>
               </div>
@@ -159,7 +159,7 @@ export default function SettingsPage() {
                       disabled={avatarSaving}
                       className={`aspect-square rounded-xl flex items-center justify-center text-2xl transition-all active:scale-95 ${
                         player.avatar_url === icon
-                          ? 'bg-[#C62828]/30 border border-[#C62828]/60'
+                          ? 'bg-[var(--toc-theme-accent)]/30 border border-[var(--toc-theme-accent)]/60'
                           : 'bg-[#252525] border border-[#333] hover:border-[#555]'
                       }`}
                     >
@@ -209,7 +209,7 @@ export default function SettingsPage() {
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder={player.full_name}
-                  className="flex-1 px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] transition-colors"
+                  className="flex-1 px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[var(--toc-theme-accent)] transition-colors"
                 />
                 <Button variant="secondary" size="sm" loading={saving} onClick={handleSaveName}>
                   Save
@@ -228,7 +228,7 @@ export default function SettingsPage() {
                 maxLength={200}
                 rows={3}
                 placeholder="A few words about your game…"
-                className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] transition-colors resize-none"
+                className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[var(--toc-theme-accent)] transition-colors resize-none"
               />
               <div className="text-right text-xs text-[#6B7280] font-[Barlow] mt-1">
                 {bio.length}/200
@@ -248,7 +248,7 @@ export default function SettingsPage() {
                     className={[
                       'flex-1 py-2 rounded-lg text-xs font-[Barlow] font-medium border transition-all',
                       preferredDisc === d
-                        ? 'bg-[#C62828] border-[#C62828] text-white'
+                        ? 'bg-[var(--toc-theme-accent)] border-[var(--toc-theme-accent)] text-white'
                         : 'border-[#333] text-[#9CA3AF]',
                     ].join(' ')}
                   >
@@ -284,7 +284,7 @@ export default function SettingsPage() {
             </div>
             <button
               onClick={() => setSoundEnabled(!soundEnabled)}
-              className={`w-12 h-6 rounded-full transition-colors relative ${soundEnabled ? 'bg-[#C62828]' : 'bg-[#333]'}`}
+              className={`w-12 h-6 rounded-full transition-colors relative ${soundEnabled ? 'bg-[var(--toc-theme-accent)]' : 'bg-[#333]'}`}
             >
               <div className={`w-5 h-5 rounded-full bg-white absolute top-0.5 transition-transform ${soundEnabled ? 'translate-x-6' : 'translate-x-0.5'}`} />
             </button>
@@ -308,7 +308,7 @@ export default function SettingsPage() {
               <button
                 onClick={pushSubscribed ? pushUnsubscribe : pushSubscribe}
                 disabled={pushLoading || pushPermission === 'denied'}
-                className={`w-12 h-6 rounded-full transition-colors relative disabled:opacity-40 ${pushSubscribed ? 'bg-[#C62828]' : 'bg-[#333]'}`}
+                className={`w-12 h-6 rounded-full transition-colors relative disabled:opacity-40 ${pushSubscribed ? 'bg-[var(--toc-theme-accent)]' : 'bg-[#333]'}`}
               >
                 <div className={`w-5 h-5 rounded-full bg-white absolute top-0.5 transition-transform ${pushSubscribed ? 'translate-x-6' : 'translate-x-0.5'}`} />
               </button>
@@ -322,7 +322,7 @@ export default function SettingsPage() {
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}>
           <GlassCard className="p-5" hover onClick={() => navigate('/admin')}>
             <div className="flex items-center gap-3">
-              <Shield size={20} className="text-[#C62828]" />
+              <Shield size={20} className="text-[var(--toc-theme-accent)]" />
               <div>
                 <div className="font-[Barlow] font-semibold text-[#E8E2D6]">Admin Dashboard</div>
                 <div className="text-[#9CA3AF] text-xs font-[Barlow]">Disputes, treasury, player management</div>

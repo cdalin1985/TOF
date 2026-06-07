@@ -14,18 +14,25 @@ import { Badge } from '../components/Badge';
 import { CardSkeleton } from '../components/Skeleton';
 import { formatDate } from '../utils/time';
 import type { Match, PlayerDisciplineStats } from '../types/database';
+import { LEAGUE, type LeagueDiscipline } from '../config/league';
 
-type Discipline = '8 Ball' | '9 Ball' | '10 Ball';
-const DISCIPLINES: Discipline[] = ['8 Ball', '9 Ball', '10 Ball'];
-const DISC_EMOJI: Record<Discipline, string> = { '8 Ball': '🎱', '9 Ball': '🔵', '10 Ball': '🟡' };
-type HistoryFilter = 'All' | 'Wins' | 'Losses' | '8 Ball' | '9 Ball' | '10 Ball';
+type Discipline = LeagueDiscipline;
+const DISCIPLINES = LEAGUE.disciplines.map((d) => d.value) as Discipline[];
+const DISC_EMOJI: Record<Discipline, string> = {
+  '8 Ball': '🎱',
+  '9 Ball': '🔵',
+  '10 Ball': '🟡',
+  Saratoga: '🎯',
+};
+type HistoryFilter = 'All' | 'Wins' | 'Losses' | Discipline;
 
-function canChallenge(myPos: number, theirPos: number, isFirstChallenge: boolean): boolean {
+function canChallenge(myPos: number, theirPos: number): boolean {
   if (myPos === theirPos) return false;
-  if (myPos === 1) return true; // #1 can challenge anyone (top-5 obligation)
-  if (myPos <= 10) return Math.abs(myPos - theirPos) <= 5; // top-10: ±5 in either direction
-  if (isFirstChallenge) return theirPos < myPos && (myPos - theirPos) <= 10;
-  return theirPos < myPos && (myPos - theirPos) <= 5;
+  if (myPos === 1) return theirPos <= 5; // #1 can challenge down to top-5 to fulfill obligation
+  if (theirPos >= myPos) return false; // normally can only challenge up
+  if (myPos <= 11) return theirPos === myPos - 1; // Top 11 can only challenge 1 spot up
+  if (myPos === 12) return theirPos === 11 || theirPos === 10; // Only #11 and #12 can challenge #10
+  return myPos - theirPos <= 2; // spots 12+ can challenge up to 2 spots
 }
 
 export default function PlayerPage() {
@@ -38,10 +45,9 @@ export default function PlayerPage() {
 
   const targetRanking = rankings.find((r) => r.player.id === id);
   const myRanking     = rankings.find((r) => r.player.id === myPlayer?.id);
-  const isFirstChallenge = (myRanking?.stats?.challenges_issued ?? 0) === 0;
 
   const eligible = myRanking && targetRanking
-    ? canChallenge(myRanking.ranking.position, targetRanking.ranking.position, isFirstChallenge)
+    ? canChallenge(myRanking.ranking.position, targetRanking.ranking.position)
     : false;
 
   const { data: matches = [], isLoading: matchesLoading } = useQuery<Match[]>({
@@ -109,98 +115,70 @@ export default function PlayerPage() {
       {/* Hero card */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
         <GlassCard className="p-6 text-center relative overflow-hidden mb-4">
-          <div className="absolute inset-0 bg-gradient-to-br from-[#C62828]/5 to-transparent pointer-events-none" />
+          <div
+            className="absolute inset-0 bg-gradient-to-br to-transparent pointer-events-none"
+            style={{ backgroundImage: 'linear-gradient(to bottom right, var(--toc-theme-glow-soft), transparent)' }}
+          />
           <Avatar player={player} size={80} className="mx-auto mb-4" />
           {player && !player.is_active && (
             <InactivePlayerBanner playerName={player.full_name} />
           )}
           <h1 className="font-[Bebas_Neue] text-4xl text-[#E8E2D6]">{player.full_name}</h1>
           <div className="flex items-center justify-center flex-wrap gap-2 mt-2">
-            <span className="font-[Azeret_Mono] text-2xl font-bold text-[#C62828]">
+            <span className="font-[Azeret_Mono] text-2xl font-bold" style={{ color: 'var(--toc-theme-accent)' }}>
               #{ranking.position}
             </span>
             {metrics?.fargo_rating && <Badge variant="default">FR {metrics.fargo_rating}</Badge>}
             {player.preferred_discipline && <Badge variant="default">{player.preferred_discipline}</Badge>}
             {!player.profile_id && <Badge variant="default">Unclaimed</Badge>}
             {stats?.best_rank_achieved && stats.best_rank_achieved < ranking.position && (
-              <Badge variant="default">Best #{stats.best_rank_achieved}</Badge>
+              <Badge variant="success">Best #{stats.best_rank_achieved}</Badge>
             )}
           </div>
-          {metrics?.fargo_robustness && (
-            <div className="text-[#6B7280] text-xs font-[Azeret_Mono] mt-1">
-              Robustness: {metrics.fargo_robustness}
-            </div>
-          )}
-          {player.bio && (
-            <p className="text-[#9CA3AF] text-sm font-[Barlow] mt-3 max-w-xs mx-auto leading-snug">
-              {player.bio}
-            </p>
-          )}
-          {eligible && myPlayer && (
-            <div className="mt-4">
-              <Button variant="primary" onClick={() => navigate(`/challenge/${id}`)}>
-                <Swords size={16} /> Challenge
+
+          <div className="grid grid-cols-4 gap-2 mt-6 pt-4 border-t border-white/5">
+            {[
+              { label: 'Wins',   value: stats?.wins ?? 0,     color: '#22C55E' },
+              { label: 'Losses', value: stats?.losses ?? 0,   color: '#EF4444' },
+              { label: 'Streak', value: stats?.current_streak ?? 0, color: (stats?.current_streak ?? 0) > 0 ? '#22C55E' : '#9CA3AF' },
+              { label: 'Win %',  value: `${overallWinPct}%`,  color: '#E8E2D6' },
+            ].map((s) => (
+              <div key={s.label} className="text-center">
+                <div className="font-[Azeret_Mono] font-bold text-lg" style={{ color: s.color }}>{s.value}</div>
+                <div className="text-[#6B7280] text-[10px] font-[Barlow] mt-1 uppercase">{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Action button */}
+          {eligible && player.is_active && (
+            <div className="mt-5 pt-2 border-t border-white/5 flex gap-2">
+              <Button
+                variant="primary"
+                fullWidth
+                onClick={() => navigate('/rankings?challenge=1')}
+              >
+                <Swords size={16} /> Challenge Player
               </Button>
             </div>
           )}
         </GlassCard>
       </motion.div>
 
-      {/* Overall stats */}
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06, duration: 0.35 }}>
-        <GlassCard className="p-4 mb-4">
-          <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-1">Overall</h2>
-          <div className="text-[#6B7280] text-xs font-[Barlow] mb-3" title="Wins · Losses · Forfeits">
-            Record W-L-F:{' '}
-            <span className="text-[#E8E2D6] font-[Azeret_Mono]">
-              {stats?.wins ?? 0}-{stats?.losses ?? 0}-{stats?.forfeits ?? 0}
-            </span>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: 'Wins',         value: stats?.wins ?? 0,             color: '#22C55E' },
-              { label: 'Losses',       value: stats?.losses ?? 0,           color: '#EF4444' },
-              { label: 'Forfeits',     value: stats?.forfeits ?? 0,         color: '#D4AF37' },
-              { label: 'Win %',        value: `${overallWinPct}%`,          color: '#E8E2D6' },
-              { label: 'Streak',       value: stats?.current_streak ?? 0,   color: (stats?.current_streak ?? 0) > 0 ? '#22C55E' : '#9CA3AF' },
-              { label: 'Best Streak',  value: stats?.best_streak ?? 0,      color: '#9CA3AF' },
-            ].map((s) => (
-              <div key={s.label} className="text-center bg-[#252525]/60 rounded-xl p-3">
-                <div className="font-[Azeret_Mono] font-bold text-2xl" style={{ color: s.color }}>{s.value}</div>
-                <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">{s.label}</div>
-              </div>
-            ))}
-          </div>
-          {/* Challenge stats row */}
-          <div className="grid grid-cols-3 gap-3 mt-3">
-            {[
-              { label: 'Challenger W',  value: stats?.challenger_wins ?? 0,  color: '#22C55E' },
-              { label: 'Defender W',    value: stats?.defender_wins ?? 0,    color: '#22C55E' },
-              { label: 'Forfeit W',     value: stats?.forfeit_wins ?? 0,     color: '#D4AF37' },
-            ].map((s) => (
-              <div key={s.label} className="text-center bg-[#252525]/60 rounded-xl p-3">
-                <div className="font-[Azeret_Mono] font-bold text-2xl" style={{ color: s.color }}>{s.value}</div>
-                <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">{s.label}</div>
-              </div>
-            ))}
-          </div>
-        </GlassCard>
-      </motion.div>
-
-      {/* Per-discipline stats */}
+      {/* Discipline Stats */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.35 }}>
         <GlassCard className="p-4 mb-4">
-          <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-3">By Discipline</h2>
-          {/* Tabs */}
-          <div className="flex gap-1 mb-4 bg-[#1A1A1A] rounded-xl p-1">
+          <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-3">Discipline Stats</h2>
+          <div className="flex gap-1.5 mb-4 overflow-x-auto pb-0.5">
             {DISCIPLINES.map((d) => (
               <button
                 key={d}
                 onClick={() => setDiscTab(d)}
                 className={[
-                  'flex-1 py-2 rounded-lg text-xs font-[Barlow] font-medium transition-all duration-200 flex items-center justify-center gap-1',
-                  discTab === d ? 'bg-[#C62828] text-white' : 'text-[#9CA3AF]',
+                  'flex-1 py-2 px-3 rounded-lg text-xs font-[Barlow] font-medium transition-all duration-200 flex items-center justify-center gap-1',
+                  discTab === d ? 'text-white' : 'text-[#9CA3AF]',
                 ].join(' ')}
+                style={discTab === d ? { backgroundColor: 'var(--toc-theme-accent)' } : {}}
               >
                 {DISC_EMOJI[d]} {d}
               </button>
@@ -266,15 +244,16 @@ export default function PlayerPage() {
           ) : (
             <>
               {/* Filters */}
-              <div className="flex gap-1.5 mb-3 overflow-x-auto pb-0.5">
-                {(['All', 'Wins', 'Losses', '8 Ball', '9 Ball', '10 Ball'] as HistoryFilter[]).map((f) => (
+              <div className="flex gap-1.5 mb-3 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
+                {(['All', 'Wins', 'Losses', ...DISCIPLINES] as HistoryFilter[]).map((f) => (
                   <button
                     key={f}
                     onClick={() => setHistoryFilter(f)}
                     className={[
                       'px-3 py-1 rounded-full text-xs font-[Barlow] font-medium whitespace-nowrap transition-all shrink-0',
-                      historyFilter === f ? 'bg-[#C62828] text-white' : 'bg-[#1A1A1A] text-[#9CA3AF] border border-[#333]',
+                      historyFilter === f ? 'text-white' : 'bg-[#1A1A1A] text-[#9CA3AF] border border-[#333]',
                     ].join(' ')}
+                    style={historyFilter === f ? { backgroundColor: 'var(--toc-theme-accent)' } : {}}
                   >
                     {f}
                   </button>
@@ -285,7 +264,7 @@ export default function PlayerPage() {
                   .filter((m) => {
                     if (historyFilter === 'Wins')   return m.winner_id === id;
                     if (historyFilter === 'Losses') return m.loser_id  === id;
-                    if (historyFilter === '8 Ball' || historyFilter === '9 Ball' || historyFilter === '10 Ball')
+                    if (DISCIPLINES.includes(historyFilter as Discipline))
                       return m.discipline === historyFilter;
                     return true;
                   })

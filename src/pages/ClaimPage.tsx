@@ -93,7 +93,7 @@ export default function ClaimPage() {
             placeholder="Search your name…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#1A1A1A] border border-[#333] text-[#E8E2D6] font-[Barlow] focus:outline-none focus:border-[#C62828] transition-colors"
+            className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#1A1A1A] border border-[#333] text-[#E8E2D6] font-[Barlow] focus:outline-none focus:border-[var(--toc-theme-accent)] transition-colors"
           />
           {search && (
             <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -144,7 +144,7 @@ export default function ClaimPage() {
                         {p.metrics?.fargo_rating ? ` · Fargo ${p.metrics.fargo_rating}` : ''}
                       </div>
                     </div>
-                    <div className="text-[#C62828] text-xs font-[Barlow] font-medium">Claim →</div>
+                    <div className="text-[var(--toc-theme-accent)] text-xs font-[Barlow] font-medium">Claim →</div>
                   </GlassCard>
                 </motion.div>
               ))

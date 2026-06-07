@@ -9,14 +9,10 @@ import { PoolBall } from '../components/PoolBall';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import { InactivePlayerBanner } from '../components/InactivePlayerBanner';
+import { LEAGUE, type LeagueDiscipline } from '../config/league';
 
-type Discipline = '8 Ball' | '9 Ball' | '10 Ball';
-
-const DISCIPLINES: { value: Discipline; emoji: string; desc: string }[] = [
-  { value: '8 Ball', emoji: '🎱', desc: 'Classic — BCA rules, pocket the 8 last' },
-  { value: '9 Ball', emoji: '🔵', desc: 'Fast-paced — modified BCA, call the 9' },
-  { value: '10 Ball', emoji: '🟡', desc: 'Strategic — call shot, 10 in the middle' },
-];
+type Discipline = LeagueDiscipline;
+const DISCIPLINES = LEAGUE.disciplines;
 
 export default function ChallengePage() {
   const { id } = useParams<{ id: string }>();
@@ -28,8 +24,8 @@ export default function ChallengePage() {
   const myRanking = rankings.find((r) => r.player.id === player?.id);
   const [step, setStep]             = useState(1);
   const [discipline, setDiscipline] = useState<Discipline | null>(null);
-  const [race, setRace]             = useState(7);
-  const [raceInput, setRaceInput]   = useState('7');
+  const [race, setRace]             = useState<number>(LEAGUE.minRace);
+  const [raceInput, setRaceInput]   = useState<string>(String(LEAGUE.minRace));
   const [raceError, setRaceError]   = useState('');
   const [sending, setSending]       = useState(false);
   const [sent, setSent]             = useState(false);
@@ -37,13 +33,15 @@ export default function ChallengePage() {
 
   if (!target) return null;
 
+  const bothInTop20 = !!myRanking && myRanking.ranking.position <= 20 && target.ranking.position <= 20;
+
   const handleRaceChange = (val: string) => {
     setRaceInput(val);
     const n = parseInt(val, 10);
     if (!val || isNaN(n)) {
       setRaceError('Enter a race length.');
-    } else if (n < 6) {
-      setRaceError('Minimum race length is 6.');
+    } else if (n < LEAGUE.minRace) {
+      setRaceError(`Minimum race length is ${LEAGUE.minRace}.`);
     } else {
       setRaceError('');
       setRace(n);
@@ -51,7 +49,11 @@ export default function ChallengePage() {
   };
 
   const handleSend = async () => {
-    if (!discipline || raceError || race < 6) return;
+    if (!discipline || raceError || race < LEAGUE.minRace) return;
+    if (discipline === 'Saratoga' && !bothInTop20) {
+      setError('Saratoga is only allowed when both players are in the Top 20.');
+      return;
+    }
     setSending(true);
     setError('');
     const { data: { session } } = await supabase.auth.getSession();
@@ -73,6 +75,7 @@ export default function ChallengePage() {
   };
 
   if (sent) {
+    const days = Math.round(LEAGUE.challengeResponseHours / 24);
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6">
         <motion.div
@@ -90,7 +93,7 @@ export default function ChallengePage() {
           </motion.div>
           <h1 className="font-[Bebas_Neue] text-5xl text-[#E8E2D6] mb-2">Challenge Sent!</h1>
           <p className="text-[#9CA3AF] font-[Barlow] mb-8">
-            {target.player.full_name} has 7 days to respond.
+            {target.player.full_name} has {days === 1 ? '1 day' : `${days} days`} to respond.
           </p>
           <PoolBall position={target.ranking.position} size={80} className="mx-auto mb-8" />
           <Button variant="secondary" onClick={() => navigate('/challenges')}>
@@ -135,29 +138,41 @@ export default function ChallengePage() {
       {/* Progress dots */}
       <div className="flex justify-center gap-2 mb-6">
         {[1, 2, 3].map((s) => (
-          <div key={s} className={`h-1.5 rounded-full transition-all duration-300 ${s === step ? 'w-6 bg-[#C62828]' : s < step ? 'w-3 bg-[#C62828]/50' : 'w-3 bg-[#333]'}`} />
+          <div
+            key={s}
+            className={`h-1.5 rounded-full transition-all duration-300 ${s === step ? 'w-6' : 'w-3'}`}
+            style={{
+              backgroundColor: s === step ? 'var(--toc-theme-accent)' : s < step ? 'var(--toc-theme-glow)' : '#333'
+            }}
+          />
         ))}
       </div>
 
       <AnimatePresence mode="wait">
         {step === 1 && (
           <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-3">
-            {DISCIPLINES.map((d) => (
-              <GlassCard
-                key={d.value}
-                hover
-                onClick={() => setDiscipline(d.value)}
-                className="p-5 flex items-center gap-4"
-                glow={discipline === d.value}
-              >
-                <span className="text-4xl">{d.emoji}</span>
-                <div className="flex-1">
-                  <div className="font-[Bebas_Neue] text-2xl text-[#E8E2D6]">{d.value}</div>
-                  <div className="text-[#9CA3AF] text-sm font-[Barlow]">{d.desc}</div>
-                </div>
-                {discipline === d.value && <CheckCircle size={20} className="text-[#C62828] shrink-0" />}
-              </GlassCard>
-            ))}
+            {DISCIPLINES.map((d) => {
+              const isBlockedSaratoga = d.value === 'Saratoga' && !bothInTop20;
+              return (
+                <GlassCard
+                  key={d.value}
+                  hover={!isBlockedSaratoga}
+                  onClick={() => { if (isBlockedSaratoga) return; setDiscipline(d.value); }}
+                  className={`p-5 flex items-center gap-4 ${isBlockedSaratoga ? 'opacity-40 cursor-not-allowed' : ''}`}
+                  glow={discipline === d.value}
+                >
+                  <span className="text-4xl">{d.emoji}</span>
+                  <div className="flex-1">
+                    <div className="font-[Bebas_Neue] text-2xl text-[#E8E2D6]">{d.value}</div>
+                    <div className="text-[#9CA3AF] text-sm font-[Barlow]">{d.desc}</div>
+                    {isBlockedSaratoga && (
+                      <div className="text-[#F59E0B] text-xs font-[Barlow] mt-1 font-semibold">Top 20 matches only</div>
+                    )}
+                  </div>
+                  {discipline === d.value && <CheckCircle size={20} className="shrink-0" style={{ color: 'var(--toc-theme-accent)' }} />}
+                </GlassCard>
+              );
+            })}
             <div className="pt-4">
               <Button variant="primary" fullWidth size="lg" disabled={!discipline} onClick={() => setStep(2)}>
                 Next <ChevronRight size={18} />
@@ -172,7 +187,7 @@ export default function ChallengePage() {
               <div className="text-[#9CA3AF] font-[Barlow] text-sm mb-4">Race Length</div>
               <div className="flex items-center justify-center gap-5">
                 <button
-                  onClick={() => { const n = Math.max(6, race - 1); setRace(n); setRaceInput(String(n)); setRaceError(''); }}
+                  onClick={() => { const n = Math.max(LEAGUE.minRace, race - 1); setRace(n); setRaceInput(String(n)); setRaceError(''); }}
                   className="w-12 h-12 rounded-full bg-[#252525] border border-[#333] flex items-center justify-center active:scale-95 transition-transform"
                 >
                   <Minus size={20} className="text-[#9CA3AF]" />
@@ -182,7 +197,7 @@ export default function ChallengePage() {
                     type="number"
                     value={raceInput}
                     onChange={(e) => handleRaceChange(e.target.value)}
-                    min={6}
+                    min={LEAGUE.minRace}
                     className="w-full text-center bg-transparent font-[Azeret_Mono] font-bold text-6xl text-[#E8E2D6] focus:outline-none"
                   />
                 </div>
@@ -193,13 +208,16 @@ export default function ChallengePage() {
                   <Plus size={20} className="text-[#9CA3AF]" />
                 </button>
               </div>
-              <div className={`text-sm mt-2 font-[Barlow] ${raceError ? 'text-[#EF4444]' : 'text-[#C62828]'}`}>
+              <div
+                className="text-sm mt-2 font-[Barlow]"
+                style={{ color: raceError ? '#EF4444' : 'var(--toc-theme-accent)' }}
+              >
                 {raceError || `First to ${race} wins`}
               </div>
-              <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">Minimum race to 6 · No maximum</div>
+              <div className="text-[#6B7280] text-xs font-[Barlow] mt-1">Minimum race to {LEAGUE.minRace} · No maximum</div>
             </GlassCard>
 
-            <Button variant="primary" fullWidth size="lg" disabled={!!raceError || race < 6} onClick={() => setStep(3)}>
+            <Button variant="primary" fullWidth size="lg" disabled={!!raceError || race < LEAGUE.minRace} onClick={() => setStep(3)}>
               Next <ChevronRight size={18} />
             </Button>
           </motion.div>
@@ -215,7 +233,7 @@ export default function ChallengePage() {
                   { label: 'Their Rank', value: `#${target.ranking.position}` },
                   { label: 'Discipline', value: discipline ?? '' },
                   { label: 'Race',       value: `First to ${race}` },
-                  { label: 'Expires',    value: '7 days' },
+                  { label: 'Expires',    value: `${LEAGUE.challengeResponseHours} hours` },
                 ].map((row) => (
                   <div key={row.label} className="flex justify-between items-center">
                     <span className="text-[#9CA3AF] text-sm font-[Barlow]">{row.label}</span>
@@ -228,7 +246,7 @@ export default function ChallengePage() {
             {/* Match fee reminder */}
             <GlassCard className="p-4">
               <div className="text-[#F59E0B] text-sm font-[Barlow] leading-relaxed">
-                💰 <strong>Match Fee: $5 per player.</strong> Use the envelope at the venue or pay digitally — you'll select your method when submitting the result.
+                💰 <strong>Match Fee: ${LEAGUE.matchFeePerPlayer} per player.</strong> Use the envelope at the venue or pay digitally — you'll select your method when submitting the result.
               </div>
             </GlassCard>
 

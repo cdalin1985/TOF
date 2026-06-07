@@ -13,8 +13,9 @@ import { EmptyState } from '../components/EmptyState';
 import { RankingRowSkeleton } from '../components/Skeleton';
 import { formatDateTime } from '../utils/time';
 import type { Challenge } from '../types/database';
+import { LEAGUE } from '../config/league';
 
-const VENUES = ['Eagles 4040', 'Valley Hub'] as const;
+const VENUES = LEAGUE.sponsorBars;
 type Venue = typeof VENUES[number];
 type ChallengeWithHoursLeft = Challenge & { hours_left: number };
 
@@ -119,7 +120,7 @@ function RespondModal({
             <select
               value={venue}
               onChange={(e) => setVenue(e.target.value as Venue)}
-              className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
+              className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[var(--toc-theme-accent)]"
             >
               <option value="">Select venue…</option>
               {VENUES.map((v) => <option key={v} value={v}>{v}</option>)}
@@ -135,7 +136,7 @@ function RespondModal({
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 min={new Date().toISOString().split('T')[0]}
-                className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
+                className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[var(--toc-theme-accent)]"
               />
             </div>
             <div>
@@ -146,7 +147,7 @@ function RespondModal({
                 type="time"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
+                className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[var(--toc-theme-accent)]"
               />
             </div>
           </div>
@@ -251,8 +252,9 @@ export default function ChallengesPage() {
             onClick={() => setTab(t.key)}
             className={[
               'flex-1 py-2 rounded-lg text-sm font-[Barlow] font-medium transition-all duration-200',
-              tab === t.key ? 'bg-[#C62828] text-white' : 'text-[#9CA3AF]',
+              tab === t.key ? 'text-white' : 'text-[#9CA3AF]',
             ].join(' ')}
+            style={tab === t.key ? { backgroundColor: 'var(--toc-theme-accent)' } : {}}
           >
             {t.label}
             {t.count > 0 && (
@@ -351,20 +353,6 @@ export default function ChallengesPage() {
                           Cancel
                         </Button>
                       )}
-                      {(c.status === 'scheduled' || c.status === 'in_progress') && (
-                        <>
-                          <Button variant="secondary" size="sm" onClick={() => navigate(`/match/${c.id}`)}>
-                            View Match
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => callFn({ challenge_id: c.id, action: 'wash' })}
-                          >
-                            Couldn't agree
-                          </Button>
-                        </>
-                      )}
                     </div>
                   </div>
                 </GlassCard>
@@ -374,15 +362,16 @@ export default function ChallengesPage() {
         </div>
       )}
 
-      <AnimatePresence>
-        {responding && (
+      {/* Respond Modal */}
+      {responding && (
+        <AnimatePresence>
           <RespondModal
             challenge={responding}
             onClose={() => setResponding(null)}
             onSuccess={handleSuccess}
           />
-        )}
-      </AnimatePresence>
+        </AnimatePresence>
+      )}
     </div>
   );
 }

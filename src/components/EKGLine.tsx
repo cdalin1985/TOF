@@ -10,7 +10,7 @@ export const EKGLine: React.FC<EKGLineProps> = ({ className = '', animated = tru
     viewBox="0 0 200 20"
     xmlns="http://www.w3.org/2000/svg"
     className={`w-[120px] h-[12px] ${className}`}
-    style={{ filter: 'drop-shadow(0 0 3px rgba(198,40,40,0.65))' }}
+    style={{ filter: 'drop-shadow(0 0 3px var(--toc-theme-accent))' }}
     aria-hidden
   >
     {animated && (
@@ -32,7 +32,7 @@ export const EKGLine: React.FC<EKGLineProps> = ({ className = '', animated = tru
       className={animated ? 'ekg-line' : ''}
       points="0,10 30,10 40,10 50,2 55,18 60,6 65,14 70,10 80,10 200,10"
       fill="none"
-      stroke="#C62828"
+      stroke="var(--toc-theme-accent)"
       strokeWidth="1.5"
       strokeLinecap="round"
       strokeLinejoin="round"

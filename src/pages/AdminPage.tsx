@@ -59,7 +59,7 @@ export default function AdminPage() {
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`flex flex-col items-center py-2 px-3 rounded-lg text-xs font-[Barlow] transition-all whitespace-nowrap shrink-0 ${tab === key ? 'bg-[#C62828] text-white' : 'text-[#9CA3AF]'}`}
+            className={`flex flex-col items-center py-2 px-3 rounded-lg text-xs font-[Barlow] transition-all whitespace-nowrap shrink-0 ${tab === key ? 'bg-[var(--toc-theme-accent)] text-white' : 'text-[#9CA3AF]'}`}
           >
             <Icon size={16} className="mb-0.5" />
             {label}
@@ -164,12 +164,12 @@ function DisputesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <input type="number" placeholder="P1 score" value={p1Score} onChange={(e) => setP1Score(e.target.value)}
-                  className="px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[#C62828]" />
+                  className="px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[var(--toc-theme-accent)]" />
                 <input type="number" placeholder="P2 score" value={p2Score} onChange={(e) => setP2Score(e.target.value)}
-                  className="px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[#C62828]" />
+                  className="px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[var(--toc-theme-accent)]" />
               </div>
               <textarea placeholder="Admin notes…" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
-                className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[#C62828] resize-none" />
+                className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[var(--toc-theme-accent)] resize-none" />
               <div className="flex gap-2">
                 <Button variant="ghost" size="sm" onClick={() => setResolving(null)}>Cancel</Button>
                 <Button variant="primary" size="sm" loading={loading} disabled={!winnerId} onClick={() => handleResolve(m.id)}>Resolve</Button>
@@ -500,12 +500,12 @@ function MatchesAdminTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <input type="number" placeholder={`${getName(m.player1_id)} score`} value={p1Score} onChange={(e) => setP1Score(e.target.value)}
-                  className="px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[#C62828]" />
+                  className="px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[var(--toc-theme-accent)]" />
                 <input type="number" placeholder={`${getName(m.player2_id)} score`} value={p2Score} onChange={(e) => setP2Score(e.target.value)}
-                  className="px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[#C62828]" />
+                  className="px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[var(--toc-theme-accent)]" />
               </div>
               <textarea placeholder="Admin notes…" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
-                className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[#C62828] resize-none" />
+                className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[var(--toc-theme-accent)] resize-none" />
               <div className="flex gap-2">
                 <Button variant="ghost" size="sm" onClick={() => setResolving(null)}>Cancel</Button>
                 <Button variant="primary" size="sm" loading={loading} disabled={!winnerId} onClick={() => handleForceComplete(m.id)}>
@@ -603,7 +603,7 @@ function RankingsTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
           const changed = original?.position !== i + 1;
           return (
             <GlassCard key={r.player_id} className={`p-3 flex items-center gap-3 ${changed ? 'border border-[#F59E0B]/30' : ''}`}>
-              <span className="font-[Azeret_Mono] font-bold text-lg text-[#C62828] w-7 text-center shrink-0">
+              <span className="font-[Azeret_Mono] font-bold text-lg text-[var(--toc-theme-accent)] w-7 text-center shrink-0">
                 {i + 1}
               </span>
               <span className="font-[Barlow] font-semibold text-sm text-[#E8E2D6] flex-1 truncate">
@@ -818,13 +818,13 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
           <h3 className="font-[Bebas_Neue] text-lg text-[#E8E2D6] mb-3">Add New Player</h3>
           <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Full name" autoFocus
             onKeyDown={(e) => e.key === 'Enter' && handleAddPlayer()}
-            className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] mb-2" />
+            className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[var(--toc-theme-accent)] mb-2" />
           <input type="number" min={0} step={1} inputMode="numeric" value={newFargo} onChange={(e) => setNewFargo(e.target.value)} placeholder="Fargo rating (optional)"
             onKeyDown={(e) => e.key === 'Enter' && handleAddPlayer()}
-            className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] mb-2" />
+            className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[var(--toc-theme-accent)] mb-2" />
           <input type="email" inputMode="email" autoComplete="off" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="Email (optional — sends invite)"
             onKeyDown={(e) => e.key === 'Enter' && handleAddPlayer()}
-            className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828] mb-1" />
+            className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[var(--toc-theme-accent)] mb-1" />
           <p className="text-[#6B7280] text-xs font-[Barlow] mb-3">
             Leave blank to add as unclaimed. With email, an invite is sent immediately.
           </p>
@@ -850,7 +850,7 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
       <div className="flex gap-2">
         {(['all', 'claimed', 'unclaimed'] as const).map((f) => (
           <button key={f} onClick={() => setFilter(f)}
-            className={`flex-1 py-2 rounded-lg text-xs font-[Barlow] font-medium transition-all ${filter === f ? 'bg-[#C62828] text-white' : 'bg-[#252525] text-[#9CA3AF] border border-[#333]'}`}>
+            className={`flex-1 py-2 rounded-lg text-xs font-[Barlow] font-medium transition-all ${filter === f ? 'bg-[var(--toc-theme-accent)] text-white' : 'bg-[#252525] text-[#9CA3AF] border border-[#333]'}`}>
             {f === 'all' ? 'All' : f === 'claimed' ? 'Claimed' : 'Unclaimed'}
           </button>
         ))}
@@ -894,7 +894,7 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
                   onChange={(e) => { setInviteEmail(e.target.value); setInviteError(''); }}
                   onKeyDown={(e) => e.key === 'Enter' && handleInvite(p)}
                   placeholder={`Email for ${p.full_name}`}
-                  className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]"
+                  className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[var(--toc-theme-accent)]"
                 />
                 {inviteError && <p className="text-[#EF4444] text-xs font-[Barlow]">{inviteError}</p>}
                 <div className="flex gap-2">
@@ -977,9 +977,9 @@ function TreasuryTab() {
             ))}
           </div>
           <input type="number" step="0.01" placeholder="Amount ($)" value={amount} onChange={(e) => setAmount(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]" />
+            className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[var(--toc-theme-accent)]" />
           <input placeholder="Description" value={desc} onChange={(e) => setDesc(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[#C62828]" />
+            className="w-full px-3 py-2.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Barlow] text-sm focus:outline-none focus:border-[var(--toc-theme-accent)]" />
           {error && <p className="text-[#EF4444] text-xs font-[Barlow]">{error}</p>}
           <Button variant="primary" fullWidth loading={loading} onClick={handleAdd} disabled={!amount || !desc}>Add Entry</Button>
         </div>
@@ -1156,7 +1156,7 @@ function SettingsField({ label, unit, value, onChange }: SettingsFieldProps) {
           const raw = event.target.value;
           onChange(raw === '' ? '' : Number(raw));
         }}
-        className="w-20 px-3 py-1.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Azeret_Mono] text-sm text-center focus:outline-none focus:border-[#C62828]"
+        className="w-20 px-3 py-1.5 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Azeret_Mono] text-sm text-center focus:outline-none focus:border-[var(--toc-theme-accent)]"
       />
     </div>
   );

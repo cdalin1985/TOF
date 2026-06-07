@@ -26,10 +26,10 @@ export const GlassCard: React.FC<GlassCardProps> = ({
     'glass-card ' +
     (gold ? 'gold-shimmer ' : '') +
     (hover ? 'glass-card-hover cursor-pointer ' : '') +
-    (glow ? 'border-[#C62828]/40 shadow-[0_0_20px_rgba(198,40,40,0.15)] ' : '') +
+    (glow ? 'border-[var(--toc-theme-accent)]/40 shadow-[0_0_20px_var(--toc-theme-glow-soft)] ' : '') +
     className;
 
-  const resolvedStyle = { ...(glow ? { borderColor: 'rgba(198,40,40,0.35)' } : {}), ...style };
+  const resolvedStyle = { ...(glow ? { borderColor: 'var(--toc-theme-border-strong)' } : {}), ...style };
   const Component = Tag;
 
   if (onClick) {
