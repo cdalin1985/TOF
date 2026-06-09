@@ -2,6 +2,8 @@
 -- Source: supabase_migrations.schema_migrations
 -- Name: align_toc_canon_settings_min_race_6
 
+alter table public.league_settings add column if not exists first_challenge_range integer not null default 10;
+
 update public.league_settings
 set
   min_race = 6,

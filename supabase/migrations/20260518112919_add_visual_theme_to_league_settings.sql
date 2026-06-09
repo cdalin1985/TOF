@@ -25,7 +25,7 @@ begin
   ) then
     alter table public.league_settings
       add constraint league_settings_theme_name_check
-      check (theme_name in ('classic', 'neon-billiards'));
+      check (theme_name in ('classic', 'neon-billiards', 'emerald-forest'));
   end if;
 end $$;
 

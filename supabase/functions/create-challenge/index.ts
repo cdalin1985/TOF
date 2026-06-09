@@ -23,32 +23,30 @@ async function sendPush(supabase: any, playerId: string, title: string, body: st
 function canChallenge(
   myPos: number,
   theirPos: number,
-  isFirstChallenge: boolean,
   challengeRange: number,
-  firstChallengeRange: number,
 ): string | null {
   if (myPos === theirPos) return 'You cannot challenge yourself.';
-  if (myPos === 1) return null;
 
-  if (myPos <= 10) {
-    if (Math.abs(myPos - theirPos) > challengeRange) {
-      return `Top-10 players can only challenge within ${challengeRange} spots up or down.`;
-    }
-    return null;
+  // TOF rule: #1 can challenge down to Top 5 to satisfy the rank-1 obligation.
+  if (myPos === 1) {
+    if (theirPos >= 2 && theirPos <= 5) return null;
+    return 'Rank #1 can only challenge players ranked #2 through #5.';
   }
 
-  if (isFirstChallenge) {
-    if (theirPos >= myPos) return 'Your first challenge must be against someone ranked above you.';
-    if ((myPos - theirPos) > firstChallengeRange) {
-      return `Your first challenge can only be up to ${firstChallengeRange} spots above you.`;
-    }
-    return null;
-  }
-
+  // Everyone else challenges upward only.
   if (theirPos >= myPos) return 'You can only challenge players ranked above you.';
+
+  // TOF rule: Top 11 can only move one spot at a time.
+  if (myPos <= 11) {
+    if (theirPos === myPos - 1) return null;
+    return 'Players in the Top 11 can only challenge one spot above them.';
+  }
+
+  // TOF rule: spots 12+ may challenge up to the configured challenge range.
   if ((myPos - theirPos) > challengeRange) {
     return `You can only challenge players up to ${challengeRange} spots above you.`;
   }
+
   return null;
 }
 
@@ -65,17 +63,18 @@ serve(async (req) => {
 
     const { data: settings } = await supabase
       .from('league_settings')
-      .select('min_race, max_race, challenge_range, first_challenge_range, challenge_expiry_days, challenge_weekly_limit')
+      .select('min_race, max_race, challenge_range, challenge_expiry_days, challenge_weekly_limit, disciplines')
       .single();
 
     const minRace = settings?.min_race ?? 6;
     const maxRace = settings?.max_race;
-    const challengeRange = settings?.challenge_range ?? 5;
-    const firstChallengeRange = settings?.first_challenge_range ?? 10;
-    const challengeExpiryDays = settings?.challenge_expiry_days ?? 7;
+    const challengeRange = settings?.challenge_range ?? 2;
+    const challengeExpiryDays = settings?.challenge_expiry_days ?? 2;
     const weeklyLimit = settings?.challenge_weekly_limit ?? 2;
 
-    const validDisciplines = ['8 Ball', '9 Ball', '10 Ball'];
+    const validDisciplines = Array.isArray(settings?.disciplines) && settings.disciplines.length > 0
+      ? settings.disciplines
+      : ['8 Ball', '9 Ball', '10 Ball', 'Saratoga'];
     if (!validDisciplines.includes(discipline)) return new Response(JSON.stringify({ error: 'Invalid discipline.' }), { headers: corsHeaders });
     if (!Number.isInteger(race_length) || race_length < minRace) return new Response(JSON.stringify({ error: `Race length must be at least ${minRace}.` }), { headers: corsHeaders });
     if (Number.isInteger(maxRace) && race_length > maxRace) return new Response(JSON.stringify({ error: `Race length cannot exceed ${maxRace}.` }), { headers: corsHeaders });
@@ -100,11 +99,12 @@ serve(async (req) => {
 
     await supabase.rpc('expire_stale_challenges');
 
-    const { count: priorChallenges } = await supabase.from('challenges').select('id', { count: 'exact', head: true }).eq('challenger_id', challenger.id);
-    const isFirstChallenge = (priorChallenges ?? 0) === 0;
-
-    const eligibilityError = canChallenge(myPos, theirPos, isFirstChallenge, challengeRange, firstChallengeRange);
+    const eligibilityError = canChallenge(myPos, theirPos, challengeRange);
     if (eligibilityError) return new Response(JSON.stringify({ error: eligibilityError }), { headers: corsHeaders });
+
+    if (discipline === 'Saratoga' && (myPos > 20 || theirPos > 20)) {
+      return new Response(JSON.stringify({ error: 'Saratoga is only allowed when both players are ranked in the Top 20.' }), { headers: corsHeaders });
+    }
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
     const { count: weeklyCount } = await supabase.from('challenges').select('id', { count: 'exact', head: true }).eq('challenger_id', challenger.id).gte('created_at', sevenDaysAgo);

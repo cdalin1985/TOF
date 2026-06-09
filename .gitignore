@@ -2,10 +2,14 @@ node_modules
 dist
 .env.local
 .env.*.local
+.env.local.backup-*
 *.log
 .DS_Store
 
 .vercel
+
+# Supabase CLI local link/cache; never commit project temp state
+supabase/.temp/
 
 # Local diagnostic logs
 npm-install-log.txt

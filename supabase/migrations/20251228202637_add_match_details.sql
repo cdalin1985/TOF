@@ -1,7 +1,3 @@
--- Recovered from Supabase migration history (version 20251228202637).
--- Source: supabase_migrations.schema_migrations
--- Name: add_match_details
-
-ALTER TABLE matches 
-ADD COLUMN IF NOT EXISTS venue text,
-ADD COLUMN IF NOT EXISTS match_date timestamp with time zone;
+-- TOF bootstrap note: add_match_details was a recovered pre-schema TOC migration.
+-- It is intentionally a no-op in the TOF repo because the canonical recovered base schema starts at 20260321032528.
+-- Keeping this version as no-op preserves migration ordering for clean white-label resets without referencing tables before they exist.

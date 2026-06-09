@@ -1,6 +1,3 @@
--- Recovered from Supabase migration history (version 20251228203910).
--- Source: supabase_migrations.schema_migrations
--- Name: add_robustness_column
-
-ALTER TABLE profiles 
-ADD COLUMN IF NOT EXISTS robustness integer DEFAULT 0;
+-- TOF bootstrap note: add_robustness_column was a recovered pre-schema TOC migration.
+-- It is intentionally a no-op in the TOF repo because the canonical recovered base schema starts at 20260321032528.
+-- Keeping this version as no-op preserves migration ordering for clean white-label resets without referencing tables before they exist.

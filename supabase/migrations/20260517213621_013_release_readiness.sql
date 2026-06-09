@@ -6,6 +6,32 @@
 -- TOC App - Migration 013: Release Readiness
 -- ============================================================
 
+-- TOF bootstrap compatibility: recovered migration assumes these live-drift columns/tables already exist.
+ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS player1_payment_method text;
+ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS player2_payment_method text;
+ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS player1_paid boolean NOT NULL DEFAULT false;
+ALTER TABLE public.matches ADD COLUMN IF NOT EXISTS player2_paid boolean NOT NULL DEFAULT false;
+ALTER TABLE public.player_season_stats ADD COLUMN IF NOT EXISTS forfeits integer NOT NULL DEFAULT 0;
+ALTER TABLE public.player_season_stats ADD COLUMN IF NOT EXISTS forfeit_wins integer NOT NULL DEFAULT 0;
+ALTER TABLE public.player_season_stats ADD COLUMN IF NOT EXISTS challenger_wins integer NOT NULL DEFAULT 0;
+ALTER TABLE public.player_season_stats ADD COLUMN IF NOT EXISTS best_rank_achieved integer;
+CREATE TABLE IF NOT EXISTS public.player_discipline_stats (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  player_id uuid NOT NULL REFERENCES public.players(id) ON DELETE CASCADE,
+  discipline text NOT NULL,
+  wins integer NOT NULL DEFAULT 0,
+  losses integer NOT NULL DEFAULT 0,
+  points integer NOT NULL DEFAULT 0,
+  current_streak integer NOT NULL DEFAULT 0,
+  best_streak integer NOT NULL DEFAULT 0,
+  matches_played integer NOT NULL DEFAULT 0,
+  forfeits integer NOT NULL DEFAULT 0,
+  forfeit_wins integer NOT NULL DEFAULT 0,
+  challenger_wins integer NOT NULL DEFAULT 0,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(player_id, discipline)
+);
+
 -- 1. Replace legacy match payment method values.
 ALTER TABLE public.matches DROP CONSTRAINT IF EXISTS matches_player1_payment_method_check;
 ALTER TABLE public.matches DROP CONSTRAINT IF EXISTS matches_player2_payment_method_check;
