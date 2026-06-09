@@ -11,6 +11,7 @@ import { LoadingScreen } from './LoadingScreen';
 import { OfflineBanner } from './OfflineBanner';
 import { PWAInstallBanner } from './PWAInstallBanner';
 import { AdminThemeSwitcher } from './admin/AdminThemeSwitcher';
+import { isTopOfTheFallsDemoMode } from '../demo/topOfTheFallsDemo';
 import { useQuery } from '@tanstack/react-query';
 
 // Screens that show bottom nav
@@ -25,6 +26,7 @@ export const Layout: React.FC = () => {
   const { session, player, isLoading, setSession, setProfile, setPlayer, setIsLoading, reset } = useAuthStore();
   const { isOffline, setIsOffline } = useUIStore();
   const [appReady, setAppReady] = useState(false);
+  const demoMode = isTopOfTheFallsDemoMode();
 
   // Bootstrap auth state
   useEffect(() => {
@@ -88,11 +90,12 @@ export const Layout: React.FC = () => {
     const path = location.pathname;
     const publicPaths = ['/login', '/auth/callback'];
     if (publicPaths.includes(path)) return;
+    if (demoMode) return;
 
     if (!session) { navigate('/login', { replace: true }); return; }
     if (!player && path !== '/claim') { navigate('/claim', { replace: true }); return; }
     if (player && path === '/claim') { navigate('/', { replace: true }); return; }
-  }, [session, player, isLoading, location.pathname, navigate]);
+  }, [session, player, isLoading, location.pathname, navigate, demoMode]);
 
   // Realtime subscriptions
   useEffect(() => {
@@ -143,7 +146,7 @@ export const Layout: React.FC = () => {
     refetchInterval: 30000,
   });
 
-  const showNav = showsNav(location.pathname) && !!session && !!player;
+  const showNav = showsNav(location.pathname) && ((!!session && !!player) || demoMode);
 
   return (
     <div className="relative min-h-screen bg-[var(--toc-theme-bg,#0D0D0D)] overflow-hidden">

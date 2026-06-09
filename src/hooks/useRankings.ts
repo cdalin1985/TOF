@@ -1,11 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
+import { getTopOfTheFallsDemoRankings, isTopOfTheFallsDemoMode } from '../demo/topOfTheFallsDemo';
 import type { RankedPlayer, Player, Ranking, PlayerMetrics, PlayerSeasonStats } from '../types/database';
 
 export function useRankings() {
   return useQuery<RankedPlayer[]>({
     queryKey: ['rankings'],
     queryFn: async () => {
+      if (isTopOfTheFallsDemoMode()) return getTopOfTheFallsDemoRankings();
+
       const [playersRes, rankingsRes, metricsRes, statsRes] = await Promise.all([
         supabase.from('players').select('*').eq('is_active', true),
         supabase.from('rankings').select('*').order('position'),
