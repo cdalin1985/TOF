@@ -24,7 +24,7 @@ TOC.Monster is a separate production app and must not receive TOF customer data.
 - Vercel project: `toc-app`
 - Public URL: `https://toc.monster`
 - Supabase project: `toc1`
-- Local checkout should be: `C:/Users/chase/toc-app`
+- Local checkout should be: `C:/Users/chase/toc-monster-app`
 
 ## Rule
 

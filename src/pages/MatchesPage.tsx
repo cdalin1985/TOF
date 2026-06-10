@@ -14,7 +14,7 @@ import { Button } from '../components/Button';
 import { formatDateTime } from '../utils/time';
 import type { Match } from '../types/database';
 
-type DiscFilter = 'All' | '8 Ball' | '9 Ball' | '10 Ball';
+type DiscFilter = 'All' | '8 Ball' | '9 Ball' | '10 Ball' | 'Saratoga';
 
 export default function MatchesPage() {
   const { player } = useAuthStore();

@@ -8,6 +8,8 @@ This repo is the dedicated Top of the Falls white-label app. It is separate from
 
 ```text
 TOF repo:      https://github.com/cdalin1985/TOF
+TOF Vercel:    tof-app / https://tof-app-theta.vercel.app
+TOF Supabase:  TOF / sqcqmovskpoyutfyslym
 TOC 1 repo:    https://github.com/cdalin1985/claude-agent0toc
 TOC 1 live:    https://toc.monster
 TOF customer:  Top of the Falls / Great Falls, MT
@@ -20,8 +22,9 @@ TOF customer:  Top of the Falls / Great Falls, MT
 - Built from the hardened TOC 1 production baseline.
 - Customized for Top of the Falls / Great Falls branding and rules.
 - Includes an emerald/gold `emerald-forest` theme.
-- Includes a localhost-only review mode for Carl's 117-player roster.
-- Requires its own dedicated Supabase project before real customer data should be seeded.
+- Has its own dedicated Supabase project (`sqcqmovskpoyutfyslym`) with the TOF roster seeded.
+- Is deployed through the Git-linked Vercel project `tof-app` from the `main` branch.
+- Includes a localhost-only review mode for non-production review/demo screens.
 
 Safe local review URLs after starting preview:
 
@@ -60,7 +63,7 @@ Challenge movement is customized for TOF:
 ```bash
 npm install
 npm run build
-npm test
+npm run test
 npm run preview -- --port 4173 --host 127.0.0.1
 ```
 

@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS challenges (
     'submitted', 'confirmed', 'disputed', 'resolved',
     'declined', 'expired', 'forfeited', 'cancelled'
   )),
-  venue TEXT CHECK (venue IN ('Eagles 4040', 'Valley Hub')),
+  venue TEXT CHECK (venue IN ('Silver Spur', 'Lido', 'Black Eagle Country Club')),
   scheduled_at TIMESTAMPTZ,
   expires_at TIMESTAMPTZ NOT NULL,
   response_message TEXT,
@@ -145,8 +145,8 @@ CREATE TABLE IF NOT EXISTS treasury_ledger (
 
 CREATE TABLE IF NOT EXISTS league_settings (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  venues TEXT[] NOT NULL DEFAULT ARRAY['Eagles 4040', 'Valley Hub'],
-  disciplines TEXT[] NOT NULL DEFAULT ARRAY['8 Ball', '9 Ball', '10 Ball'],
+  venues TEXT[] NOT NULL DEFAULT ARRAY['Silver Spur', 'Lido', 'Black Eagle Country Club'],
+  disciplines TEXT[] NOT NULL DEFAULT ARRAY['8 Ball', '9 Ball', '10 Ball', 'Saratoga'],
   min_race INTEGER NOT NULL DEFAULT 5,
   max_race INTEGER NOT NULL DEFAULT 15,
   challenge_range INTEGER NOT NULL DEFAULT 5,
@@ -156,7 +156,7 @@ CREATE TABLE IF NOT EXISTS league_settings (
 );
 
 INSERT INTO league_settings (venues, disciplines)
-SELECT ARRAY['Eagles 4040', 'Valley Hub'], ARRAY['8 Ball', '9 Ball', '10 Ball']
+SELECT ARRAY['Silver Spur', 'Lido', 'Black Eagle Country Club'], ARRAY['8 Ball', '9 Ball', '10 Ball', 'Saratoga']
 WHERE NOT EXISTS (SELECT 1 FROM league_settings);
 
 CREATE TABLE IF NOT EXISTS audit_events (

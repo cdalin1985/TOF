@@ -10,6 +10,7 @@ import { Button } from '../components/Button';
 import { EmptyState } from '../components/EmptyState';
 import { RankingRowSkeleton } from '../components/Skeleton';
 import { formatDistanceToNow } from '../utils/time';
+import { LEAGUE } from '../config/league';
 import type { Notification } from '../types/database';
 
 const TYPE_ICONS: Record<string, string> = {
@@ -25,7 +26,7 @@ const TYPE_ICONS: Record<string, string> = {
   rank_changed:       '📈',
 };
 
-const VENUES = ['Eagles 4040', 'Valley Hub'] as const;
+const VENUES = LEAGUE.sponsorBars;
 type Venue = typeof VENUES[number];
 
 function RespondInline({

@@ -6,7 +6,7 @@ const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-const VALID_VENUES = ['Eagles 4040', 'Valley Hub'];
+const VALID_VENUES = ['Silver Spur', 'Lido', 'Black Eagle Country Club'];
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });

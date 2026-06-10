@@ -1,40 +1,57 @@
-﻿# AGENTS.md — TOC Agent Instructions
+﻿# CODEX.md — TOF Agent Instructions
 
-## Workspace policy
+## Identity
 
-TOC_WORKSPACE is the command center.
-claude-agent0toc is the app code repo only.
-TOC-Agent-Swarm is the automation/swarm folder only.
+This repository is **Top of the Falls (TOF)** only.
 
-Do not place scratch files, patch ZIPs, exported prompts, or temporary documents in this app repo unless they are intentional project documentation under docs/.
+- Customer/league: Top of the Falls, Great Falls, MT
+- Local checkout: `C:/Users/chase/tof-app`
+- GitHub repo: `cdalin1985/TOF`
+- Vercel project: `tof-app`
+- Public URL: `https://tof-app-theta.vercel.app`
+- Supabase project/ref: TOF / `sqcqmovskpoyutfyslym`
+- Production branch: `main`
 
-## Canonical paths
+## Boundary rule
 
-- App repo: C:\Users\chase\Desktop\claude-agent0toc
-- Swarm: C:\Users\chase\Desktop\TOC-Agent-Swarm
-- Workspace: C:\Users\chase\Desktop\TOC_WORKSPACE
+Do not mix TOF and TOC.Monster work.
 
-## Operating rule
+- TOF work belongs in `C:/Users/chase/tof-app` and deploys to Vercel project `tof-app`.
+- TOC.Monster work belongs in `C:/Users/chase/toc-monster-app` and deploys to Vercel project `toc-app`.
+- Never put Top of the Falls roster files, Carl notes, TOF migrations, or TOF Supabase config in the TOC.Monster checkout.
+- Never point TOF code at TOC.Monster's Supabase project or Vercel project.
 
-When doing TOC work:
+If identity is unclear, verify before editing:
 
-1. Protect TOC canon first.
-2. Use small branch/PR slices.
-3. Run lint/build before PR.
-4. Do not modify .env, secrets, node_modules, dist, or lockfiles without explicit instruction.
-5. Keep app code in this repo, automation in the swarm folder, and project support files in TOC_WORKSPACE.
-6. For terminal snippets, always put the correct cd path as the first line.
+```bash
+git remote -v
+cat .vercel/project.json
+cat supabase/.temp/project-ref 2>/dev/null || true
+```
 
-## TOC canon
+## TOF canon
 
-- Minimum race = 6.
-- New league member first challenge = up to 10 spots above.
-- Regular non-top-10 = up to 5 spots above only.
-- Top 10 = up/down 5 spots.
-- Rank #1 can challenge anyone.
-- Post-loss cooldown = 24 hours.
-- Single unified ranking list.
-- Disciplines = 8 Ball, 9 Ball, 10 Ball.
-- Venues = Eagles 4040 and Valley Hub.
-- Treasury visible to all players.
-- Only super_admin manages treasury.
+Use live `league_settings` and migrations as the source of truth. Current TOF defaults:
+
+- Disciplines: 8 Ball, 9 Ball, 10 Ball
+- Venues: Silver Spur, Lido, Black Eagle Country Club
+- Claim flow: email → 6-digit code → claim own unclaimed roster name
+- Carl Higgins may be super_admin even before claiming his player row
+- Treasury is a ledger/admin function; no real payment processing is live yet
+
+## Work style
+
+1. Protect customer/demo readiness first.
+2. Use `main` for production deploys unless Chase explicitly asks for a branch/PR.
+3. Run `npm run build` and `npm run test` before claiming app changes are ready.
+4. Do not modify `.env`, secrets, `node_modules`, `dist`, or lockfiles without explicit instruction.
+5. Keep scratch files out of the repo unless they are intentional project documentation under `docs/` or customer setup notes.
+6. For terminal snippets, always use the correct TOF path first:
+
+```bash
+cd /c/Users/chase/tof-app
+```
+
+## Historical upstream notes
+
+Some older docs may reference the original TOC.Monster app because TOF was split from that codebase. Treat those as upstream history, not current TOF deployment instructions, unless they have been explicitly updated for TOF.

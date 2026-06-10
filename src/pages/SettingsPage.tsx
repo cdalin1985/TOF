@@ -11,7 +11,7 @@ import { Avatar } from '../components/Avatar';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 
-const DISCIPLINES = ['8 Ball', '9 Ball', '10 Ball'] as const;
+const DISCIPLINES = ['8 Ball', '9 Ball', '10 Ball', 'Saratoga'] as const;
 
 const PRESET_ICONS = ['🎱','🔵','🟡','🦁','🐺','🦅','🐉','⚡','🔥','🎯','💀','🌙'];
 
@@ -338,8 +338,8 @@ export default function SettingsPage() {
         <GlassCard className="p-5">
           <h2 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-3">About</h2>
           <div className="space-y-1 text-[#9CA3AF] text-sm font-[Barlow]">
-            <div>Top of the Capital — Helena Pool League</div>
-            <div className="text-[#6B7280] text-xs">Version 1.0.0 · Built with ❤️ in Helena, MT</div>
+            <div>Top of the Falls — Great Falls Pool League</div>
+            <div className="text-[#6B7280] text-xs">Version 1.0.0 · Built with ❤️ in Great Falls, MT</div>
           </div>
         </GlassCard>
       </motion.div>

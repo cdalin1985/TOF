@@ -22,7 +22,7 @@ export interface Database {
           profile_id: string | null;
           full_name: string;
           bio: string | null;
-          preferred_discipline: '8 Ball' | '9 Ball' | '10 Ball' | null;
+          preferred_discipline: '8 Ball' | '9 Ball' | '10 Ball' | 'Saratoga' | null;
           avatar_url: string | null;
           is_active: boolean;
           created_at: string;
@@ -59,10 +59,10 @@ export interface Database {
           id: string;
           challenger_id: string;
           challenged_id: string;
-          discipline: '8 Ball' | '9 Ball' | '10 Ball';
+          discipline: '8 Ball' | '9 Ball' | '10 Ball' | 'Saratoga';
           race_length: number;
           status: 'pending' | 'accepted' | 'scheduled' | 'in_progress' | 'submitted' | 'confirmed' | 'disputed' | 'resolved' | 'declined' | 'expired' | 'forfeited' | 'cancelled';
-          venue: 'Eagles 4040' | 'Valley Hub' | null;
+          venue: 'Silver Spur' | 'Lido' | 'Black Eagle Country Club' | null;
           scheduled_at: string | null;
           match_deadline: string | null;
           expires_at: string;
@@ -189,7 +189,7 @@ export interface Database {
         Row: {
           id: string;
           player_id: string;
-          discipline: '8 Ball' | '9 Ball' | '10 Ball';
+          discipline: '8 Ball' | '9 Ball' | '10 Ball' | 'Saratoga';
           matches_played: number;
           wins: number;
           losses: number;
@@ -207,7 +207,7 @@ export interface Database {
         Insert: {
           id?: string;
           player_id: string;
-          discipline: '8 Ball' | '9 Ball' | '10 Ball';
+          discipline: '8 Ball' | '9 Ball' | '10 Ball' | 'Saratoga';
           matches_played?: number;
           wins?: number;
           losses?: number;
