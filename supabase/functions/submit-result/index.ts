@@ -334,7 +334,13 @@ async function confirmResult(
   ]);
   const { error: activityError } = await supabase.from('activity_feed').insert({ event_type: 'match_confirmed', headline: `${wp.data?.full_name} def. ${lp.data?.full_name} Â· ${p1Score}â€“${p2Score}`, actor_player_id: winnerId });
   if (activityError) throw activityError;
-  await checkRank1Compliance(supabase);
+  try {
+    await checkRank1Compliance(supabase);
+  } catch (error) {
+    console.error('rank1 compliance check failed after match confirmation', error);
+    // Match confirmation is already complete at this point. A maintenance check
+    // must not make both players see a failed result submission.
+  }
 }
 
 serve(async (req) => {
@@ -452,7 +458,18 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ success: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: cors });
+    const detail = e instanceof Error
+      ? { message: e.message, name: e.name, stack: e.stack }
+      : e && typeof e === 'object'
+        ? e
+        : { message: String(e) };
+    console.error('submit-result failed', detail);
+    const message = e instanceof Error
+      ? e.message
+      : e && typeof e === 'object' && 'message' in e
+        ? String((e as { message?: unknown }).message)
+        : String(e);
+    return new Response(JSON.stringify({ error: message, detail }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
 });
 
