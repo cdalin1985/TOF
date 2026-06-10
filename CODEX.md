@@ -20,6 +20,7 @@ Do not mix TOF and TOC.Monster work.
 - TOC.Monster work belongs in `C:/Users/chase/toc-monster-app` and deploys to Vercel project `toc-app`.
 - Never put Top of the Falls roster files, Carl notes, TOF migrations, or TOF Supabase config in the TOC.Monster checkout.
 - Never point TOF code at TOC.Monster's Supabase project or Vercel project.
+- `C:/Users/chase/toc-app` should remain absent/unused; the old stale TOF copy was renamed to `C:/Users/chase/toc-app_OLD_TOF_DO_NOT_USE_20260610`.
 
 If identity is unclear, verify before editing:
 
@@ -33,7 +34,7 @@ cat supabase/.temp/project-ref 2>/dev/null || true
 
 Use live `league_settings` and migrations as the source of truth. Current TOF defaults:
 
-- Disciplines: 8 Ball, 9 Ball, 10 Ball
+- Disciplines: 8 Ball, 9 Ball, 10 Ball, Saratoga (Top 20 only)
 - Venues: Silver Spur, Lido, Black Eagle Country Club
 - Claim flow: email → 6-digit code → claim own unclaimed roster name
 - Carl Higgins may be super_admin even before claiming his player row
