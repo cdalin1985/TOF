@@ -1,0 +1,31 @@
+# Supabase project config for TOF (Top of the Falls).
+# Pushed to the linked cloud project with: npx supabase config push
+# Only the sections declared here are diffed/pushed.
+
+project_id = "sqcqmovskpoyutfyslym"
+
+[auth]
+site_url = "https://tof-app-theta.vercel.app"
+additional_redirect_urls = [
+  "https://tof-app-theta.vercel.app",
+  "https://tof-app-theta.vercel.app/**",
+  "http://localhost:5173",
+  "http://localhost:4173",
+]
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+# Members sign in with a 6-digit emailed code (no password, no link).
+otp_length = 6
+otp_expiry = 3600
+
+# Sign-in code email: show the 6-digit token instead of a magic link.
+[auth.email.template.magic_link]
+subject = "Your Top of the Falls sign-in code"
+content_path = "./supabase/templates/magic_link.html"
+
+# Invite email (used when an admin invites a player by email).
+[auth.email.template.invite]
+subject = "You're invited to Top of the Falls"
+content_path = "./supabase/templates/invite.html"

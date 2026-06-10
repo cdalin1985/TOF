@@ -46,7 +46,7 @@ export default function LoginPage() {
   const handleVerifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = code.replace(/\s/g, '');
-    if (trimmed.length !== 8) return;
+    if (trimmed.length !== 6) return;
     setLoading(true);
     setError('');
     const { error: err } = await supabase.auth.verifyOtp({
@@ -69,7 +69,7 @@ export default function LoginPage() {
   };
 
   const handleCodeChange = (val: string) => {
-    const digits = val.replace(/\D/g, '').slice(0, 8);
+    const digits = val.replace(/\D/g, '').slice(0, 6);
     setCode(digits);
     setError('');
   };
@@ -178,9 +178,9 @@ export default function LoginPage() {
               </Button>
 
               {/* Helper bumped from text-xs (12px) to text-sm (14px) for legibility.
-                  Fixed: was "6-digit", actual code is 8 digits. */}
+                  Supabase auth is configured for 6-digit OTP codes (supabase/config.toml). */}
               <p className="text-center text-[#A1A1AA] text-sm font-[Barlow] leading-relaxed">
-                We'll email you an 8-digit code. No password needed.
+                We'll email you a 6-digit code. No password needed.
               </p>
             </motion.form>
           ) : (
@@ -217,7 +217,7 @@ export default function LoginPage() {
                   htmlFor="login-code"
                   className="flex items-center gap-1.5 text-[#9CA3AF] text-sm font-[Barlow] mb-3"
                 >
-                  <KeyRound size={14} /> 8-Digit Code
+                  <KeyRound size={14} /> 6-Digit Code
                 </label>
                 <input
                   id="login-code"
@@ -229,8 +229,8 @@ export default function LoginPage() {
                   autoComplete="one-time-code"
                   value={code}
                   onChange={(e) => handleCodeChange(e.target.value)}
-                  placeholder="00000000"
-                  maxLength={8}
+                  placeholder="000000"
+                  maxLength={6}
                   className="w-full px-4 py-4 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] font-[Azeret_Mono] text-3xl text-center tracking-[0.5em] placeholder-[#3A3A3A] focus:outline-none focus:border-[var(--toc-theme-accent)] focus:ring-1 focus:ring-[var(--toc-theme-glow-soft)] transition-colors"
                 />
                 {error && (
@@ -250,7 +250,7 @@ export default function LoginPage() {
                 fullWidth
                 size="lg"
                 loading={loading}
-                disabled={code.replace(/\s/g, '').length !== 8}
+                disabled={code.replace(/\s/g, '').length !== 6}
               >
                 Sign In
               </Button>
