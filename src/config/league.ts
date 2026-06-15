@@ -67,4 +67,32 @@ export const LEAGUE = {
     'You must be approved to enter the list.',
     'All games are rack-your-own. Players lag for the break; the winner breaks unless both players agree otherwise.',
     'First player to challenge gets the first chance.',
-    'Top 11: you may challenge one spot up. Spots 12 and below: you may challenge up to two spots, but if no open player is in range and the open player is directly i
+    'Top 11: you may challenge one spot up. Spots 12 and below: you may challenge up to two spots, but if no open player is in range and the open player is directly in front of you, you must challenge them or stay open to challenges from behind.',
+    'Only #11 and #12 may challenge #10.',
+    'The challenged player must respond within 48 hours of the callout.',
+    'Accepted matches must be played within 10 days. Exceptions must be approved by Top of the Falls.',
+    'The challenger picks the game and the race; both players agree on time and place; the challenged player picks the table.',
+    'Two challenges per week — your week starts from your first challenge.',
+    'Minimum race to 6, no maximum if both agree. Winner breaks unless both agree to alternate.',
+    'Match fee is $5 per player in a properly filled envelope.',
+    'Saratoga is allowed in the Top 20 only.',
+    'Matches are played at Black Eagle Country Club, Silver Spur, or the Lido when possible.',
+    'All callouts and results must be posted to the Top of the Falls Facebook page with the player tagged.',
+    'If the challenged player declines or cannot play, the challenger gets the spot.',
+    'If both players offer times but cannot agree, the match is a wash and the challenging player sits for 24 hours. The challenged player may challenge up immediately if no challenge is waiting on their spot.',
+    'If you defend your spot, include your next challenge with your result to lock it in immediately — otherwise you are open to challenges from behind until you do.',
+    'If the lower seed wins, including by forfeit, they wait 24 hours before challenging up.',
+    'If you lose, you must defend or wait 7 days before challenging up.',
+    'Players may go inactive anytime. Inactive more than 30 days drops you two spots for every 30 days inactive. On return you must defend or wait 7 days before challenging up (the last player on the list waits 24 hours). Inactive players are reviewed every 30 days and may be removed at admin discretion after 90 days of no engagement.',
+    'Questions? Contact Carl Higgins. Top of the Falls has final say on all rules. Rules subject to change.',
+  ],
+  colors: {
+    accent: '#16A34A',
+    accentHover: '#22C55E',
+    accentDeep: '#14532D',
+    accentSoft: 'rgba(22,163,74,0.12)',
+  },
+} as const;
+
+export type LeagueDiscipline = typeof LEAGUE.disciplines[number]['value'];
+export type LeagueVenue = typeof LEAGUE.sponsorBars[number];
