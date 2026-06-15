@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronLeft, AlertTriangle, Users, DollarSign, Settings, FileText,
-  Trophy, UserPlus, Swords, ArrowUp, ArrowDown, Crown, List,
+  Trophy, UserPlus, Swords, ArrowUp, ArrowDown, List,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
@@ -14,7 +14,7 @@ import { formatDistanceToNow, formatDate } from '../utils/time';
 import type { Match, Player, AuditEvent, LeagueSettings, Challenge } from '../types/database';
 import { fetchTreasurySnapshot, formatCents, ledgerSignFor } from '../lib/treasury';
 
-type TabKey = 'disputes' | 'challenges' | 'matches' | 'rankings' | 'players' | 'treasury' | 'rank1' | 'settings' | 'audit';
+type TabKey = 'disputes' | 'challenges' | 'matches' | 'rankings' | 'players' | 'treasury' | 'settings' | 'audit';
 type ChallengeRow = Challenge & { match_id: string | null };
 type RankRow = { id: string; player_id: string; position: number; full_name: string };
 
@@ -51,7 +51,6 @@ export default function AdminPage() {
           { key: 'rankings',   Icon: List,          label: 'Rankings'   },
           { key: 'players',    Icon: Users,         label: 'Players'    },
           { key: 'treasury',   Icon: DollarSign,    label: 'Treasury'   },
-          { key: 'rank1',      Icon: Crown,         label: 'Rank #1'    },
           { key: 'settings',   Icon: Settings,      label: 'Settings'   },
           { key: 'audit',      Icon: FileText,      label: 'Audit'      },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -73,7 +72,6 @@ export default function AdminPage() {
       {tab === 'rankings'   && <RankingsTab qc={qc} />}
       {tab === 'players'    && <PlayersTab qc={qc} />}
       {tab === 'treasury'   && <TreasuryTab />}
-      {tab === 'rank1'      && <Rank1Tab isSuperAdmin={profile?.role === 'super_admin'} />}
       {tab === 'settings'   && <SettingsTab />}
       {tab === 'audit'      && <AuditTab />}
     </div>
@@ -1006,105 +1004,6 @@ function TreasuryTab() {
           );
         })}
       </div>
-    </div>
-  );
-}
-
-// ─── Rank #1 Compliance ──────────────────────────────────────────────────────
-
-type Rank1Status = {
-  penalized?: boolean;
-  player?: string;
-  top5_matches?: number;
-  required_top5_matches?: number;
-  days_elapsed?: number;
-  days_remaining?: number;
-  target_rank?: number;
-  compliant?: boolean;
-  message?: string;
-  error?: string;
-};
-
-function Rank1Tab({ isSuperAdmin }: { isSuperAdmin: boolean }) {
-  const [status, setStatus] = useState<Rank1Status | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const callFn = async (enforce: boolean) => {
-    setLoading(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setLoading(false); return; }
-    try {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rank1-compliance`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ enforce }),
-      });
-      setStatus(await res.json());
-    } catch {
-      setStatus({ error: 'Network error — please try again.' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <GlassCard className="p-5">
-        <h3 className="font-[Bebas_Neue] text-xl text-[#E8E2D6] mb-1">Rank #1 Obligation</h3>
-        <p className="text-[#9CA3AF] text-xs font-[Barlow] mb-4">
-          The #1 player must play 2 top-5 opponents within 30 days of reaching #1 or be moved to #10.
-        </p>
-        <div className="flex gap-2">
-          <Button variant="secondary" fullWidth loading={loading} onClick={() => callFn(false)}>Check Status</Button>
-          {isSuperAdmin && (
-            <Button variant="danger" fullWidth loading={loading} onClick={() => callFn(true)}>Enforce Now</Button>
-          )}
-        </div>
-      </GlassCard>
-
-      {status && (
-        <GlassCard className="p-5">
-          {status.error ? (
-            <p className="text-[#EF4444] text-sm font-[Barlow]">{status.error}</p>
-          ) : status.penalized ? (
-            <>
-              <div className="text-3xl mb-2">📉</div>
-              <div className="font-[Bebas_Neue] text-xl text-[#EF4444] mb-1">Penalty Applied</div>
-              <p className="text-[#9CA3AF] text-sm font-[Barlow]">
-                {status.player} was moved to #{status.target_rank ?? 10} — only {status.top5_matches}/{status.required_top5_matches ?? 2} top-5 matches in {status.days_elapsed} days.
-              </p>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center justify-between mb-4">
-                <span className="font-[Barlow] font-semibold text-[#E8E2D6]">{status.player}</span>
-                <Badge variant={status.compliant ? 'win' : 'pending'}>{status.compliant ? 'Compliant' : 'At Risk'}</Badge>
-              </div>
-              {status.message && (
-                <p className="text-[#9CA3AF] text-sm font-[Barlow] mb-4">{status.message}</p>
-              )}
-              {status.days_elapsed !== undefined && (
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="text-center">
-                    <div className="font-[Azeret_Mono] font-bold text-2xl text-[#E8E2D6]">{status.top5_matches}/{status.required_top5_matches ?? 2}</div>
-                    <div className="text-[#6B7280] text-xs font-[Barlow]">Top-5 matches</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="font-[Azeret_Mono] font-bold text-2xl text-[#E8E2D6]">{status.days_elapsed}</div>
-                    <div className="text-[#6B7280] text-xs font-[Barlow]">Days elapsed</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="font-[Azeret_Mono] font-bold text-2xl" style={{ color: (status.days_remaining ?? 30) <= 2 ? '#EF4444' : '#E8E2D6' }}>
-                      {status.days_remaining}
-                    </div>
-                    <div className="text-[#6B7280] text-xs font-[Barlow]">Days left</div>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </GlassCard>
-      )}
     </div>
   );
 }

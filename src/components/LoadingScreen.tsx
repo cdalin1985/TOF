@@ -30,6 +30,12 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ visible }) => (
               background: 'radial-gradient(ellipse at center, var(--toc-theme-glow) 0%, transparent 70%)',
             }}
           />
+          <img
+            src="/tof-logo.png"
+            alt="Top of the Falls — Bar Box Union Local 406"
+            className="w-24 h-24 rounded-full mx-auto mb-4 relative"
+            style={{ filter: 'drop-shadow(0 0 36px var(--toc-theme-glow))' }}
+          />
           <div
             className="font-[Bebas_Neue] text-8xl tracking-widest relative"
             style={{

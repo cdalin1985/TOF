@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Swords, Trophy, TrendingUp, AlertTriangle, DollarSign, X } from 'lucide-react';
+import { Swords, Trophy, TrendingUp, DollarSign, X } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { useRankings } from '../hooks/useRankings';
@@ -11,6 +11,7 @@ import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { Skeleton } from '../components/Skeleton';
+import { LeagueRulesCard } from '../components/LeagueRulesCard';
 import type { ActivityFeedItem, Match, Notification, Challenge } from '../types/database';
 import { formatDistanceToNow } from '../utils/time';
 import { LEAGUE } from '../config/league';
@@ -92,46 +93,7 @@ export default function HomePage() {
     },
   });
 
-  // #1 compliance
-  const isRank1 = myRanking?.ranking.position === 1;
-  const { data: rank1Compliance } = useQuery({
-    queryKey: ['rank1-compliance', player?.id],
-    queryFn: async () => {
-      if (!player || !isRank1) return null;
-      const { data: rankRow } = await supabase
-        .from('rankings')
-        .select('rank1_since')
-        .eq('player_id', player.id)
-        .single();
-      if (!rankRow?.rank1_since) return null;
-      const rank1Since = new Date(rankRow.rank1_since);
-      const daysSince  = (Date.now() - rank1Since.getTime()) / (1000 * 3600 * 24);
-      const { data: top5 } = await supabase
-        .from('rankings')
-        .select('player_id')
-        .gte('position', 2)
-        .lte('position', 5);
-      const top5Ids = (top5 ?? []).map((r: { player_id: string }) => r.player_id);
-      let matchCount = 0;
-      if (top5Ids.length > 0) {
-        const { count } = await supabase
-          .from('matches')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'confirmed')
-          .gte('completed_at', rankRow.rank1_since)
-          .in('player1_id', top5Ids)
-          .or(`player2_id.in.(${top5Ids.join(',')})`); // matches where one opponent is top-5
-        matchCount = count ?? 0;
-      }
-      return {
-        matchCount,
-        daysRemaining: Math.max(0, Math.ceil(30 - daysSince)),
-        compliant: matchCount >= 2,
-      };
-    },
-    enabled: !!player && isRank1,
-    refetchInterval: 60000,
-  });
+  // TOF has no Rank #1 down-obligation, so no #1 compliance tracking.
 
   const myStats = myRanking?.stats;
 
@@ -190,6 +152,9 @@ export default function HomePage() {
           </GlassCard>
         </motion.div>
       )}
+
+      {/* Official league rules (collapsible) */}
+      <LeagueRulesCard />
 
       {/* Action banners — pending challenges */}
       {pendingChallenges.length > 0 && (
@@ -294,27 +259,6 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="text-[#9CA3AF] text-xs font-[Barlow] shrink-0">View →</div>
-            </div>
-          </GlassCard>
-        </motion.div>
-      )}
-
-      {/* #1 compliance banner */}
-      {isRank1 && rank1Compliance && (
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-          <GlassCard className={`p-4 border ${rank1Compliance.compliant ? 'border-[#22C55E]/30' : rank1Compliance.daysRemaining <= 5 ? 'border-[#EF4444]/40' : 'border-[#F59E0B]/30'}`}>
-            <div className="flex items-start gap-3">
-              <AlertTriangle size={18} className={rank1Compliance.compliant ? 'text-[#22C55E]' : rank1Compliance.daysRemaining <= 5 ? 'text-[#EF4444]' : 'text-[#F59E0B]'} />
-              <div className="flex-1">
-                <div className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">
-                  {rank1Compliance.compliant ? '✅ #1 Obligation Met' : `#1 Obligation — ${rank1Compliance.matchCount}/2 top-5 matches`}
-                </div>
-                <div className="text-[#9CA3AF] text-xs font-[Barlow] mt-0.5">
-                  {rank1Compliance.compliant
-                    ? `Window resets in ${rank1Compliance.daysRemaining} days`
-                    : `${rank1Compliance.daysRemaining} days left to play top-5 opponents or you drop to #10`}
-                </div>
-              </div>
             </div>
           </GlassCard>
         </motion.div>

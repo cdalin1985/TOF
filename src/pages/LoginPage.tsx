@@ -94,9 +94,14 @@ export default function LoginPage() {
           <motion.div
             animate={{ y: [0, -6, 0] }}
             transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-            className="text-6xl mb-4 flex justify-center"
+            className="mb-4 flex justify-center"
           >
-            🎱
+            <img
+              src="/tof-logo.png"
+              alt="Top of the Falls — Bar Box Union Local 406, Great Falls, Montana"
+              className="w-28 h-28 rounded-full"
+              style={{ filter: 'drop-shadow(0 0 28px var(--toc-theme-glow))' }}
+            />
           </motion.div>
           <h1
             className="font-[Bebas_Neue] text-6xl tracking-widest leading-none"
