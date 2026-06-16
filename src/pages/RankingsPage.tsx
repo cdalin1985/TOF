@@ -11,12 +11,30 @@ import { RankingRowSkeleton } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
 import type { RankedPlayer } from '../types/database';
 
+type Eligibility = { ok: boolean; reason?: string };
+
+// Positional challenge rules for Top of the Falls. Returns whether you may
+// challenge a given rank and, if not, a short plain-language reason.
+function challengeEligibility(myPos: number, theirPos: number): Eligibility {
+  if (myPos === theirPos) return { ok: false, reason: 'This is you' };
+  if (theirPos > myPos) return { ok: false, reason: 'Ranked below you' };
+  if (myPos <= 11) {
+    return theirPos === myPos - 1
+      ? { ok: true }
+      : { ok: false, reason: 'Top 11: one spot up only' };
+  }
+  if (myPos === 12) {
+    return theirPos === 11 || theirPos === 10
+      ? { ok: true }
+      : { ok: false, reason: 'From #12: only #10 or #11' };
+  }
+  return myPos - theirPos <= 2
+    ? { ok: true }
+    : { ok: false, reason: 'Out of range — two spots up max' };
+}
+
 function canChallenge(myPos: number, theirPos: number): boolean {
-  if (myPos === theirPos) return false;
-  if (theirPos >= myPos) return false; // can only challenge up (no Rank #1 down-obligation in TOF)
-  if (myPos <= 11) return theirPos === myPos - 1; // Top 11 can only challenge 1 spot up
-  if (myPos === 12) return theirPos === 11 || theirPos === 10; // Only #11 and #12 can challenge #10
-  return myPos - theirPos <= 2; // spots 12+ can challenge up to 2 spots
+  return challengeEligibility(myPos, theirPos).ok;
 }
 
 function RankCard({
@@ -36,7 +54,10 @@ function RankCard({
   const pos       = rp.ranking.position;
   const isMe      = rp.player.id === myPlayerId;
   const isTop3    = pos <= 3;
-  const eligible  = myPosition !== null && canChallenge(myPosition, pos) && !isMe;
+  const eligibility: Eligibility = myPosition !== null ? challengeEligibility(myPosition, pos) : { ok: false };
+  const eligible  = eligibility.ok && !isMe;
+  // In challenge mode, explain why ineligible opponents can't be challenged.
+  const showReason = challengeMode && myPosition !== null && !isMe && !eligible;
   const rankChange = rp.ranking.previous_position !== null
     ? rp.ranking.previous_position - pos  // positive = moved up
     : 0;
@@ -52,6 +73,7 @@ function RankCard({
           'glass-card p-3 flex items-center gap-3 cursor-pointer',
           'transition-all duration-200',
           isTop3 ? 'gold-shimmer' : '',
+          showReason ? 'opacity-50' : '',
         ].join(' ')}
         style={isMe ? { borderColor: 'var(--toc-theme-border-strong)', boxShadow: '0 0 16px var(--toc-theme-glow-soft)' } : undefined}
         onClick={() => navigate(`/player/${rp.player.id}`)}
@@ -116,6 +138,13 @@ function RankCard({
             <Swords size={12} />
             Challenge
           </motion.button>
+        )}
+
+        {/* Why this opponent can't be challenged (challenge mode only) */}
+        {showReason && eligibility.reason && (
+          <span className="shrink-0 text-[10px] font-[Barlow] text-[#6B7280] text-right max-w-[92px] leading-tight">
+            {eligibility.reason}
+          </span>
         )}
       </div>
     </motion.div>
