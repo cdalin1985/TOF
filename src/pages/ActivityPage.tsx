@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { QueryError } from '../components/QueryError';
 import { supabase } from '../lib/supabase';
 import { GlassCard } from '../components/GlassCard';
 import type { ActivityFeedItem } from '../types/database';
@@ -64,7 +65,7 @@ export default function ActivityPage() {
   const [filter, setFilter] = useState<Filter>('all');
   const [limit, setLimit]   = useState(40);
 
-  const { data: feed = [], isLoading } = useQuery<ActivityFeedItem[]>({
+  const { data: feed = [], isLoading, isError, refetch } = useQuery<ActivityFeedItem[]>({
     queryKey: ['activity-feed-full', filter, limit],
     queryFn: async () => {
       let query = supabase
@@ -74,7 +75,8 @@ export default function ActivityPage() {
         .limit(limit);
       const events = FILTER_EVENTS[filter];
       if (events) query = query.in('event_type', events);
-      const { data } = await query;
+      const { data, error } = await query;
+      if (error) throw error;
       return data ?? [];
     },
   });
@@ -118,6 +120,8 @@ export default function ActivityPage() {
               <div key={i} className="skeleton h-12 rounded-lg" />
             ))}
           </div>
+        ) : isError ? (
+          <QueryError onRetry={() => refetch()} />
         ) : feed.length === 0 ? (
           <p className="text-[#6B7280] text-sm font-[Barlow] text-center py-10">
             No activity yet.

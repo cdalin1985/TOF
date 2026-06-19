@@ -8,6 +8,7 @@ import { useAuthStore } from '../stores/authStore';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import { EmptyState } from '../components/EmptyState';
+import { QueryError } from '../components/QueryError';
 import { RankingRowSkeleton } from '../components/Skeleton';
 import { formatDistanceToNow } from '../utils/time';
 import { LEAGUE } from '../config/league';
@@ -154,16 +155,17 @@ export default function NotificationsPage() {
   const navigate   = useNavigate();
   const qc         = useQueryClient();
 
-  const { data: notifications = [], isLoading } = useQuery<Notification[]>({
+  const { data: notifications = [], isLoading, isError, refetch } = useQuery<Notification[]>({
     queryKey: ['notifications', player?.id],
     queryFn: async () => {
       if (!player) return [];
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('notifications')
         .select('*')
         .eq('player_id', player.id)
         .order('created_at', { ascending: false })
         .limit(50);
+      if (error) throw error;
       return data ?? [];
     },
     enabled: !!player,
@@ -223,6 +225,8 @@ export default function NotificationsPage() {
 
       {isLoading ? (
         <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <RankingRowSkeleton key={i} />)}</div>
+      ) : isError ? (
+        <QueryError onRetry={() => refetch()} />
       ) : notifications.length === 0 ? (
         <EmptyState
           icon="🔔"

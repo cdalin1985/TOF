@@ -16,6 +16,11 @@ export function useRankings() {
         supabase.from('player_season_stats').select('*'),
       ]);
 
+      // Surface fetch failures so pages can show an error state instead of an
+      // empty (and misleading) list.
+      if (playersRes.error)  throw playersRes.error;
+      if (rankingsRes.error) throw rankingsRes.error;
+
       const players  = (playersRes.data  ?? []) as Player[];
       const rankings = (rankingsRes.data ?? []) as Ranking[];
       const metrics  = (metricsRes.data  ?? []) as PlayerMetrics[];
