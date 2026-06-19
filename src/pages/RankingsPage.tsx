@@ -9,6 +9,7 @@ import { EKGLine } from '../components/EKGLine';
 import { Badge } from '../components/Badge';
 import { RankingRowSkeleton } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
+import { QueryError } from '../components/QueryError';
 import type { RankedPlayer } from '../types/database';
 
 type Eligibility = { ok: boolean; reason?: string };
@@ -152,7 +153,7 @@ function RankCard({
 }
 
 export default function RankingsPage() {
-  const { data: rankings = [], isLoading } = useRankings();
+  const { data: rankings = [], isLoading, isError, refetch } = useRankings();
   const { player } = useAuthStore();
   const [search, setSearch]   = useState('');
   const [tab, setTab]         = useState<'all' | 'near'>('all');
@@ -231,6 +232,8 @@ export default function RankingsPage() {
       <div className="space-y-2">
         {isLoading
           ? Array.from({ length: 10 }).map((_, i) => <RankingRowSkeleton key={i} />)
+          : isError
+          ? <QueryError onRetry={() => refetch()} />
           : filtered.length === 0
           ? <EmptyState
               title="No Players Found"

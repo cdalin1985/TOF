@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, CheckCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { QueryError } from '../components/QueryError';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { PoolBall } from '../components/PoolBall';
@@ -23,7 +24,7 @@ export default function ClaimPage() {
   const [claiming, setClaiming]       = useState(false);
   const [claimError, setClaimError]   = useState('');
 
-  const { data: players = [], isLoading } = useQuery({
+  const { data: players = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['unclaimed-players'],
     queryFn: async () => {
       const [playersRes, rankingsRes, metricsRes] = await Promise.all([
@@ -31,6 +32,8 @@ export default function ClaimPage() {
         supabase.from('rankings').select('*'),
         supabase.from('player_reference_metrics').select('*'),
       ]);
+      if (playersRes.error)  throw playersRes.error;
+      if (rankingsRes.error) throw rankingsRes.error;
       const rankings = (rankingsRes.data ?? []) as Ranking[];
       const metrics  = (metricsRes.data  ?? []) as PlayerMetrics[];
       return ((playersRes.data ?? []) as Player[]).map((p) => ({
@@ -114,6 +117,8 @@ export default function ClaimPage() {
                   </div>
                 </div>
               ))
+            : isError
+            ? <QueryError onRetry={() => refetch()} />
             : filtered.length === 0
             ? (
                 <div className="text-center py-12 text-[#6B7280] font-[Barlow]">

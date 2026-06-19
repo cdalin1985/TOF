@@ -10,6 +10,7 @@ import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { EmptyState } from '../components/EmptyState';
+import { QueryError } from '../components/QueryError';
 import { RankingRowSkeleton } from '../components/Skeleton';
 import { formatDateTime } from '../utils/time';
 import type { Challenge } from '../types/database';
@@ -24,11 +25,12 @@ function usePlayerChallenges(playerId: string | undefined) {
     queryKey: ['challenges', playerId],
     queryFn: async () => {
       if (!playerId) return [];
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('challenges')
         .select('*')
         .or(`challenger_id.eq.${playerId},challenged_id.eq.${playerId}`)
         .order('created_at', { ascending: false });
+      if (error) throw error;
       const now = Date.now();
       return (data ?? []).map((challenge) => ({
         ...challenge,
@@ -201,7 +203,7 @@ export default function ChallengesPage() {
   const [tab, setTab] = useState<'incoming' | 'outgoing' | 'history'>('incoming');
   const [responding, setResponding] = useState<Challenge | null>(null);
 
-  const { data: challenges = [], isLoading } = usePlayerChallenges(player?.id);
+  const { data: challenges = [], isLoading, isError, refetch } = usePlayerChallenges(player?.id);
 
   const getPlayerName = (id: string) =>
     rankings.find((r) => r.player.id === id)?.player.full_name ?? 'Unknown';
@@ -268,6 +270,8 @@ export default function ChallengesPage() {
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => <RankingRowSkeleton key={i} />)}
         </div>
+      ) : isError ? (
+        <QueryError onRetry={() => refetch()} />
       ) : currentList.length === 0 ? (
         <EmptyState
           icon={tab === 'incoming' ? '📥' : tab === 'outgoing' ? '📤' : '📋'}
