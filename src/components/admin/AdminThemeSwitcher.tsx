@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../stores/authStore';
-import { useTheme } from '../../theme/ThemeProvider';
+import { useTheme } from '../../theme/useTheme';
 import type { TocTheme } from '../../theme/themeTypes';
 
 const OPTIONS: Array<{
