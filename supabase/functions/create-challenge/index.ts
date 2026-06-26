@@ -75,24 +75,24 @@ serve(async (req) => {
     const validDisciplines = Array.isArray(settings?.disciplines) && settings.disciplines.length > 0
       ? settings.disciplines
       : ['8 Ball', '9 Ball', '10 Ball', 'Saratoga'];
-    if (!validDisciplines.includes(discipline)) return new Response(JSON.stringify({ error: 'Invalid discipline.' }), { headers: corsHeaders });
-    if (!Number.isInteger(race_length) || race_length < minRace) return new Response(JSON.stringify({ error: `Race length must be at least ${minRace}.` }), { headers: corsHeaders });
-    if (Number.isInteger(maxRace) && race_length > maxRace) return new Response(JSON.stringify({ error: `Race length cannot exceed ${maxRace}.` }), { headers: corsHeaders });
+    if (!validDisciplines.includes(discipline)) return new Response(JSON.stringify({ error: 'Invalid discipline.' }), { status: 400, headers: corsHeaders });
+    if (!Number.isInteger(race_length) || race_length < minRace) return new Response(JSON.stringify({ error: `Race length must be at least ${minRace}.` }), { status: 400, headers: corsHeaders });
+    if (Number.isInteger(maxRace) && race_length > maxRace) return new Response(JSON.stringify({ error: `Race length cannot exceed ${maxRace}.` }), { status: 400, headers: corsHeaders });
 
     const { data: challenger } = await supabase.from('players').select('id, is_active').eq('profile_id', user.id).single();
-    if (!challenger) return new Response(JSON.stringify({ error: 'You must claim a player profile first.' }), { headers: corsHeaders });
-    if (!challenger.is_active) return new Response(JSON.stringify({ error: 'Your account is inactive.' }), { headers: corsHeaders });
-    if (challenger.id === challenged_player_id) return new Response(JSON.stringify({ error: 'You cannot challenge yourself.' }), { headers: corsHeaders });
+    if (!challenger) return new Response(JSON.stringify({ error: 'You must claim a player profile first.' }), { status: 403, headers: corsHeaders });
+    if (!challenger.is_active) return new Response(JSON.stringify({ error: 'Your account is inactive.' }), { status: 403, headers: corsHeaders });
+    if (challenger.id === challenged_player_id) return new Response(JSON.stringify({ error: 'You cannot challenge yourself.' }), { status: 400, headers: corsHeaders });
 
     const { data: challenged } = await supabase.from('players').select('id, is_active').eq('id', challenged_player_id).single();
-    if (!challenged) return new Response(JSON.stringify({ error: 'That player does not exist.' }), { headers: corsHeaders });
-    if (!challenged.is_active) return new Response(JSON.stringify({ error: 'That player is currently inactive and cannot be challenged.' }), { headers: corsHeaders });
+    if (!challenged) return new Response(JSON.stringify({ error: 'That player does not exist.' }), { status: 404, headers: corsHeaders });
+    if (!challenged.is_active) return new Response(JSON.stringify({ error: 'That player is currently inactive and cannot be challenged.' }), { status: 409, headers: corsHeaders });
 
     const [challengerRankRes, challengedRankRes] = await Promise.all([
       supabase.from('rankings').select('position').eq('player_id', challenger.id).single(),
       supabase.from('rankings').select('position').eq('player_id', challenged_player_id).single(),
     ]);
-    if (!challengerRankRes.data || !challengedRankRes.data) return new Response(JSON.stringify({ error: 'Could not retrieve rankings.' }), { headers: corsHeaders });
+    if (!challengerRankRes.data || !challengedRankRes.data) return new Response(JSON.stringify({ error: 'Could not retrieve rankings.' }), { status: 404, headers: corsHeaders });
 
     const myPos = challengerRankRes.data.position;
     const theirPos = challengedRankRes.data.position;
@@ -100,25 +100,25 @@ serve(async (req) => {
     await supabase.rpc('expire_stale_challenges');
 
     const eligibilityError = canChallenge(myPos, theirPos, challengeRange);
-    if (eligibilityError) return new Response(JSON.stringify({ error: eligibilityError }), { headers: corsHeaders });
+    if (eligibilityError) return new Response(JSON.stringify({ error: eligibilityError }), { status: 400, headers: corsHeaders });
 
     if (discipline === 'Saratoga' && (myPos > 20 || theirPos > 20)) {
-      return new Response(JSON.stringify({ error: 'Saratoga is only allowed when both players are ranked in the Top 20.' }), { headers: corsHeaders });
+      return new Response(JSON.stringify({ error: 'Saratoga is only allowed when both players are ranked in the Top 20.' }), { status: 400, headers: corsHeaders });
     }
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
     const { count: weeklyCount } = await supabase.from('challenges').select('id', { count: 'exact', head: true }).eq('challenger_id', challenger.id).gte('created_at', sevenDaysAgo);
-    if ((weeklyCount ?? 0) >= weeklyLimit) return new Response(JSON.stringify({ error: `You have reached the weekly challenge limit (${weeklyLimit} per 7 days).` }), { headers: corsHeaders });
+    if ((weeklyCount ?? 0) >= weeklyLimit) return new Response(JSON.stringify({ error: `You have reached the weekly challenge limit (${weeklyLimit} per 7 days).` }), { status: 429, headers: corsHeaders });
 
     const { data: existingOut } = await supabase.from('challenges').select('id').eq('challenger_id', challenger.id).in('status', ['pending', 'accepted', 'scheduled', 'in_progress']).maybeSingle();
-    if (existingOut) return new Response(JSON.stringify({ error: 'You already have an active outgoing challenge.' }), { headers: corsHeaders });
+    if (existingOut) return new Response(JSON.stringify({ error: 'You already have an active outgoing challenge.' }), { status: 409, headers: corsHeaders });
 
     const { data: existingIn } = await supabase.from('challenges').select('id').eq('challenged_id', challenged_player_id).in('status', ['pending', 'accepted', 'scheduled', 'in_progress']).maybeSingle();
-    if (existingIn) return new Response(JSON.stringify({ error: 'That player already has an active challenge they must resolve first.' }), { headers: corsHeaders });
+    if (existingIn) return new Response(JSON.stringify({ error: 'That player already has an active challenge they must resolve first.' }), { status: 409, headers: corsHeaders });
 
     const now = new Date().toISOString();
     const { data: myCooldown } = await supabase.from('cooldowns').select('expires_at').eq('player_id', challenger.id).eq('type', 'post_match').gt('expires_at', now).maybeSingle();
-    if (myCooldown) return new Response(JSON.stringify({ error: `You are in a post-match cooldown period until ${new Date(myCooldown.expires_at).toLocaleString()}.` }), { headers: corsHeaders });
+    if (myCooldown) return new Response(JSON.stringify({ error: `You are in a post-match cooldown period until ${new Date(myCooldown.expires_at).toLocaleString()}.` }), { status: 429, headers: corsHeaders });
 
     const expiresAt = new Date(Date.now() + challengeExpiryDays * 24 * 3600 * 1000).toISOString();
     const { data: challenge, error: insertErr } = await supabase.from('challenges').insert({ challenger_id: challenger.id, challenged_id: challenged_player_id, discipline, race_length, status: 'pending', expires_at: expiresAt }).select().single();
@@ -163,7 +163,8 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ challenge_id: challenge.id }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: corsHeaders });
+    console.error('create-challenge failed', e);
+    return new Response(JSON.stringify({ error: 'Something went wrong. Please try again.' }), { status: 500, headers: corsHeaders });
   }
 });
 

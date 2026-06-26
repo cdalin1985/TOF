@@ -22,7 +22,9 @@ serve(async (req) => {
     if (authErr || !user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
 
     const { player_id } = await req.json();
-    if (!player_id) return new Response(JSON.stringify({ error: 'player_id required' }), { headers: corsHeaders });
+    if (typeof player_id !== 'string' || player_id.trim().length === 0) {
+      return new Response(JSON.stringify({ error: 'player_id required' }), { status: 400, headers: corsHeaders });
+    }
 
     // Check user hasn't already claimed
     const { data: existingPlayer } = await supabase
@@ -30,19 +32,29 @@ serve(async (req) => {
       .select('id')
       .eq('profile_id', user.id)
       .single();
-    if (existingPlayer) return new Response(JSON.stringify({ error: 'You have already claimed a player profile.' }), { headers: corsHeaders });
+    if (existingPlayer) return new Response(JSON.stringify({ error: 'You have already claimed a player profile.' }), { status: 409, headers: corsHeaders });
 
-    // Check target player is unclaimed
+    // Look up the target player for the audit trail and a clear not-found message.
     const { data: targetPlayer } = await supabase
       .from('players')
       .select('id, profile_id, full_name')
       .eq('id', player_id)
       .single();
-    if (!targetPlayer) return new Response(JSON.stringify({ error: 'Player not found.' }), { headers: corsHeaders });
-    if (targetPlayer.profile_id) return new Response(JSON.stringify({ error: 'This player has already been claimed.' }), { headers: corsHeaders });
+    if (!targetPlayer) return new Response(JSON.stringify({ error: 'Player not found.' }), { status: 404, headers: corsHeaders });
+    if (targetPlayer.profile_id) return new Response(JSON.stringify({ error: 'This player has already been claimed.' }), { status: 409, headers: corsHeaders });
 
-    // Claim it
-    await supabase.from('players').update({ profile_id: user.id }).eq('id', player_id);
+    // Claim atomically: only succeeds while profile_id is still NULL, so two
+    // concurrent claims can't both win the same roster row (TOCTOU guard).
+    const { data: claimed, error: claimError } = await supabase
+      .from('players')
+      .update({ profile_id: user.id })
+      .eq('id', player_id)
+      .is('profile_id', null)
+      .select('id');
+    if (claimError) throw claimError;
+    if (!claimed?.length) {
+      return new Response(JSON.stringify({ error: 'This player has already been claimed.' }), { status: 409, headers: corsHeaders });
+    }
 
     // Log audit event
     await supabase.from('audit_events').insert({
@@ -55,6 +67,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: corsHeaders });
+    console.error('claim-player failed', e);
+    return new Response(JSON.stringify({ error: 'Something went wrong. Please try again.' }), { status: 500, headers: corsHeaders });
   }
 });

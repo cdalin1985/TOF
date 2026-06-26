@@ -89,6 +89,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ entry_id: entry.id }), { headers: { ...cors, 'Content-Type': 'application/json' } });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: cors });
+    console.error('manage-treasury failed', e);
+    return new Response(JSON.stringify({ error: 'Something went wrong. Please try again.' }), { status: 500, headers: cors });
   }
 });

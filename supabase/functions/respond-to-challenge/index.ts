@@ -19,15 +19,15 @@ serve(async (req) => {
     const { challenge_id, action, venue, scheduled_at } = await req.json();
 
     const { data: challenge } = await supabase.from('challenges').select('*').eq('id', challenge_id).single();
-    if (!challenge) return new Response(JSON.stringify({ error: 'Challenge not found.' }), { headers: cors });
+    if (!challenge) return new Response(JSON.stringify({ error: 'Challenge not found.' }), { status: 404, headers: cors });
 
     const { data: callerPlayer } = await supabase.from('players').select('id, full_name').eq('profile_id', user.id).single();
-    if (!callerPlayer) return new Response(JSON.stringify({ error: 'Player profile not found.' }), { headers: cors });
+    if (!callerPlayer) return new Response(JSON.stringify({ error: 'Player profile not found.' }), { status: 404, headers: cors });
 
     if (action === 'accept') {
-      if (challenge.challenged_id !== callerPlayer.id) return new Response(JSON.stringify({ error: 'Not authorized.' }), { headers: cors });
-      if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Challenge is not pending.' }), { headers: cors });
-      if (!venue || !scheduled_at) return new Response(JSON.stringify({ error: 'venue and scheduled_at required.' }), { headers: cors });
+      if (challenge.challenged_id !== callerPlayer.id) return new Response(JSON.stringify({ error: 'Not authorized.' }), { status: 403, headers: cors });
+      if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Challenge is not pending.' }), { status: 409, headers: cors });
+      if (!venue || !scheduled_at) return new Response(JSON.stringify({ error: 'venue and scheduled_at required.' }), { status: 400, headers: cors });
       const scheduledAt = new Date(scheduled_at);
       if (Number.isNaN(scheduledAt.getTime())) return new Response(JSON.stringify({ error: 'scheduled_at must be a valid date.' }), { status: 400, headers: cors });
       if (scheduledAt.getTime() < Date.now() - 5 * 60 * 1000) return new Response(JSON.stringify({ error: 'Match cannot be scheduled in the past.' }), { status: 400, headers: cors });
@@ -91,8 +91,8 @@ serve(async (req) => {
       if (activityError) throw activityError;
 
     } else if (action === 'decline') {
-      if (challenge.challenged_id !== callerPlayer.id) return new Response(JSON.stringify({ error: 'Not authorized.' }), { headers: cors });
-      if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Challenge is not pending.' }), { headers: cors });
+      if (challenge.challenged_id !== callerPlayer.id) return new Response(JSON.stringify({ error: 'Not authorized.' }), { status: 403, headers: cors });
+      if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Challenge is not pending.' }), { status: 409, headers: cors });
 
       // A decline is a forfeit — ranking, cooldown, stats, activity, and notifications
       // are all written by apply_challenge_decline_forfeit so admin can later reverse it.
@@ -101,7 +101,8 @@ serve(async (req) => {
         p_actor_profile_id: user.id,
       });
       if (rpcError) {
-        return new Response(JSON.stringify({ error: rpcError.message ?? 'Could not record decline as forfeit.' }), { headers: cors });
+        console.error('apply_challenge_decline_forfeit failed', rpcError);
+        return new Response(JSON.stringify({ error: 'Could not record decline as forfeit.' }), { status: 500, headers: cors });
       }
 
       const { data: challengerPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenger_id).single();
@@ -134,7 +135,8 @@ serve(async (req) => {
         p_actor_profile_id: user.id,
       });
       if (rpcError) {
-        return new Response(JSON.stringify({ error: rpcError.message ?? 'Could not reverse decline.' }), { headers: cors });
+        console.error('reverse_challenge_decline_forfeit failed', rpcError);
+        return new Response(JSON.stringify({ error: 'Could not reverse decline.' }), { status: 500, headers: cors });
       }
 
       const { data: challengerPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenger_id).single();
@@ -160,9 +162,9 @@ serve(async (req) => {
       // Either player can declare a scheduling wash — treated as if the challenge never happened
       const isChallenger = challenge.challenger_id === callerPlayer.id;
       const isChallenged  = challenge.challenged_id === callerPlayer.id;
-      if (!isChallenger && !isChallenged) return new Response(JSON.stringify({ error: 'Not authorized.' }), { headers: cors });
+      if (!isChallenger && !isChallenged) return new Response(JSON.stringify({ error: 'Not authorized.' }), { status: 403, headers: cors });
       if (!['pending', 'accepted', 'scheduled'].includes(challenge.status)) {
-        return new Response(JSON.stringify({ error: 'Challenge cannot be washed at this stage.' }), { headers: cors });
+        return new Response(JSON.stringify({ error: 'Challenge cannot be washed at this stage.' }), { status: 409, headers: cors });
       }
 
       // Cancel with no penalties — no cooldowns, no rank changes
@@ -182,8 +184,8 @@ serve(async (req) => {
 
     } else if (action === 'cancel') {
       // Challenger cancels their own pending challenge
-      if (challenge.challenger_id !== callerPlayer.id) return new Response(JSON.stringify({ error: 'Not authorized.' }), { headers: cors });
-      if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Can only cancel pending challenges.' }), { headers: cors });
+      if (challenge.challenger_id !== callerPlayer.id) return new Response(JSON.stringify({ error: 'Not authorized.' }), { status: 403, headers: cors });
+      if (challenge.status !== 'pending') return new Response(JSON.stringify({ error: 'Can only cancel pending challenges.' }), { status: 409, headers: cors });
       await supabase.from('challenges').update({ status: 'cancelled' }).eq('id', challenge_id);
 
       const { data: challengedPlayer } = await supabase.from('players').select('full_name').eq('id', challenge.challenged_id).single();
@@ -194,11 +196,12 @@ serve(async (req) => {
       });
 
     } else {
-      return new Response(JSON.stringify({ error: 'Invalid action.' }), { headers: cors });
+      return new Response(JSON.stringify({ error: 'Invalid action.' }), { status: 400, headers: cors });
     }
 
     return new Response(JSON.stringify({ success: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: cors });
+    console.error('respond-to-challenge failed', e);
+    return new Response(JSON.stringify({ error: 'Something went wrong. Please try again.' }), { status: 500, headers: cors });
   }
 });

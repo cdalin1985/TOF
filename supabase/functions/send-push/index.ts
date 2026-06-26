@@ -18,7 +18,7 @@ serve(async (req) => {
 
     const { player_id, title, body, url } = await req.json();
     if (!player_id || !title) {
-      return new Response(JSON.stringify({ error: 'player_id and title are required.' }), { headers: cors });
+      return new Response(JSON.stringify({ error: 'player_id and title are required.' }), { status: 400, headers: cors });
     }
 
     await sendPush(supabase, player_id, title, body ?? '', url ?? '/');
@@ -27,6 +27,7 @@ serve(async (req) => {
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: cors });
+    console.error('send-push failed', e);
+    return new Response(JSON.stringify({ error: 'Something went wrong. Please try again.' }), { status: 500, headers: cors });
   }
 });

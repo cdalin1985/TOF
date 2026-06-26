@@ -352,21 +352,21 @@ serve(async (req) => {
 
     const { match_id, winner_id, final_score_player1, final_score_player2, payment_method } = await req.json();
     const normalizedPayment = normalizePayment(payment_method);
-    if (payment_method != null && payment_method !== '' && normalizedPayment === null) return new Response(JSON.stringify({ error: 'Invalid payment method.' }), { headers: cors });
+    if (payment_method != null && payment_method !== '' && normalizedPayment === null) return new Response(JSON.stringify({ error: 'Invalid payment method.' }), { status: 400, headers: cors });
 
     const { data: match } = await supabase.from('matches').select('*').eq('id', match_id).single();
-    if (!match) return new Response(JSON.stringify({ error: 'Match not found.' }), { headers: cors });
-    if (!['in_progress', 'scheduled', 'submitted'].includes(match.status)) return new Response(JSON.stringify({ error: 'Match is not in progress.' }), { headers: cors });
+    if (!match) return new Response(JSON.stringify({ error: 'Match not found.' }), { status: 404, headers: cors });
+    if (!['in_progress', 'scheduled', 'submitted'].includes(match.status)) return new Response(JSON.stringify({ error: 'Match is not in progress.' }), { status: 409, headers: cors });
 
     const raceTarget = match.race_length;
     const scoreError = validateFinalScore(winner_id, match.player1_id, match.player2_id, final_score_player1, final_score_player2, raceTarget);
-    if (scoreError) return new Response(JSON.stringify({ error: scoreError }), { headers: cors });
+    if (scoreError) return new Response(JSON.stringify({ error: scoreError }), { status: 400, headers: cors });
 
     const { data: caller } = await supabase.from('players').select('id').eq('profile_id', user.id).single();
-    if (!caller) return new Response(JSON.stringify({ error: 'Player not found.' }), { headers: cors });
+    if (!caller) return new Response(JSON.stringify({ error: 'Player not found.' }), { status: 404, headers: cors });
     const isP1 = match.player1_id === caller.id;
     const isP2 = match.player2_id === caller.id;
-    if (!isP1 && !isP2) return new Response(JSON.stringify({ error: 'Not a participant.' }), { headers: cors });
+    if (!isP1 && !isP2) return new Response(JSON.stringify({ error: 'Not a participant.' }), { status: 403, headers: cors });
 
     const submissionUpdates: Record<string, unknown> = { status: 'submitted' };
     const submittedAt = new Date().toISOString();
@@ -394,7 +394,7 @@ serve(async (req) => {
     if (submissionError) throw submissionError;
 
     const { data: updated } = await supabase.from('matches').select('*').eq('id', match_id).single();
-    if (!updated) return new Response(JSON.stringify({ error: 'Update failed.' }), { headers: cors });
+    if (!updated) return new Response(JSON.stringify({ error: 'Update failed.' }), { status: 500, headers: cors });
 
     if (updated.player1_submitted && updated.player2_submitted) {
       const { data: claimed } = await supabase.from('matches').update({ status: 'confirming' } as Record<string, unknown>).eq('id', match_id).eq('status', 'submitted').select('id');
@@ -464,12 +464,7 @@ serve(async (req) => {
         ? e
         : { message: String(e) };
     console.error('submit-result failed', detail);
-    const message = e instanceof Error
-      ? e.message
-      : e && typeof e === 'object' && 'message' in e
-        ? String((e as { message?: unknown }).message)
-        : String(e);
-    return new Response(JSON.stringify({ error: message, detail }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ error: 'Something went wrong. Please try again.' }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
   }
 });
 
