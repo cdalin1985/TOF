@@ -53,6 +53,12 @@ Use live `league_settings` and migrations as the source of truth. Current TOF de
 cd /c/Users/chase/tof-app
 ```
 
+## Tools on hand
+
+See `docs/ruflo.md` for the **ruflo** agent meta-harness — what it is, the
+curated setup that keeps it out of this product repo, and the portable
+`.claude/agents/` set that travels to other league clones.
+
 ## Historical upstream notes
 
 Some older docs may reference the original TOC.Monster app because TOF was split from that codebase. Treat those as upstream history, not current TOF deployment instructions, unless they have been explicitly updated for TOF.
