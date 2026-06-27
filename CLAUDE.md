@@ -53,6 +53,17 @@ Use live `league_settings` and migrations as the source of truth. Current TOF de
 cd /c/Users/chase/tof-app
 ```
 
+## Tools on hand
+
+Reference tools to keep available for future tasks.
+
+- **ruflo** — agent meta-harness that adds multi-agent capabilities to Claude Code / Codex (specialized agents, self-learning memory, vector DB, background workers).
+  - Repo: `https://github.com/ruvnet/ruflo.git`
+  - CLI init: `npx ruflo@latest init wizard` (full setup: MCP server, hooks, agents)
+  - Lightweight: install individual commands via Claude Code `/plugin install`
+  - Web UI: `flo.ruv.io`
+  - Not installed in this repo yet — set up on request.
+
 ## Historical upstream notes
 
 Some older docs may reference the original TOC.Monster app because TOF was split from that codebase. Treat those as upstream history, not current TOF deployment instructions, unless they have been explicitly updated for TOF.
