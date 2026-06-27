@@ -12,6 +12,14 @@ built on this codebase. For instance-specific details (admin identities, venues,
 disciplines), consult the current repo's `CLAUDE.md` and the live
 `league_settings` — never assume the names from another league.
 
+## First: confirm this league's canon exists
+
+Before auditing, read this repo's `CLAUDE.md`. If it has no league canon —
+i.e. it is an unfilled template or placeholder with no disciplines, venues, or
+claim/admin specifics — **stop and tell the user to populate the league canon
+(`CLAUDE.md` / `league_settings`) first.** Without instance facts you have
+nothing concrete to check against, and a silent pass would be misleading.
+
 ## Shared canon (the invariants you enforce)
 
 - The claim flow is: email → a 6-digit verification code → the user claims an

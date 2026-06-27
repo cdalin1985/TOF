@@ -46,17 +46,26 @@ install is needed to use these.
 
 ## If you want the full harness (isolated)
 
+Use the guarded script — it is the blessed path and enforces the safety rules
+for you (checks Node >= 20, and forces the wizard to run OUTSIDE any repo so it
+can't clobber the committed `.claude/agents/` or `CLAUDE.md`):
+
 ```bash
-node -v                                          # confirm v20+
-mkdir -p ../ruflo-lab && cd ../ruflo-lab
-npx ruflo@latest init wizard                     # full harness, OUTSIDE the app
-# then drive the app from the lab when you want heavy multi-agent work
+./scripts/setup-ruflo-lab.sh            # installs to a sibling ruflo-lab/
+# or pass an explicit out-of-repo path:
+./scripts/setup-ruflo-lab.sh ~/ruflo-lab
 ```
 
-If you ever run the wizard inside the repo anyway, back up first
-(`cp CLAUDE.md CLAUDE.md.bak`) and review `git diff CLAUDE.md`. The repo's
-`.gitignore` already guards `.claude-flow/`, `.mcp.json`, and `*.bak` so worker
-state and any secrets never get committed.
+Then drive the app from the lab folder when you want heavy multi-agent work.
+
+> **Do not** run `npx ruflo init wizard` directly inside this repo — it would
+> overwrite the committed agents and regenerate `CLAUDE.md`. The script exists
+> precisely so you don't have to remember that. As a backstop, `.gitignore`
+> guards `.claude-flow/`, `.mcp.json`, and `*.bak`.
+
+The committed agents also self-guard: if a clone's `CLAUDE.md` has no league
+canon yet, each agent will tell you to populate it before relying on the
+review.
 
 ## Lightweight alternative
 
