@@ -1,0 +1,33 @@
+name: Supabase keep-alive
+
+# Free-tier Supabase projects pause after ~7 days of inactivity, which would
+# take TOF offline between league nights until someone manually restores it.
+# This job pings the REST API every 3 days so the project stays active.
+#
+# Requirements:
+#   - Repo secret SUPABASE_ANON_KEY (Supabase dashboard -> Project Settings ->
+#     API -> "anon public" key; same value as VITE_SUPABASE_ANON_KEY).
+#   - GitHub only runs scheduled workflows from the DEFAULT branch, so this
+#     starts firing once it is merged to main.
+
+on:
+  schedule:
+    - cron: '17 6 */3 * *'  # every 3 days at ~06:17 UTC (well inside the 7-day window)
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          set -euo pipefail
+          status=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            "https://sqcqmovskpoyutfyslym.supabase.co/rest/v1/rankings?select=position&limit=1")
+          echo "Supabase keep-alive ping returned HTTP $status"
+          if [ "$status" != "200" ]; then
+            echo "::error::Keep-alive ping failed (HTTP $status) — project may be paused or the key is wrong." >&2
+            exit 1
+          fi
