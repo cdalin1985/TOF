@@ -14,3 +14,9 @@ supabase/.temp/
 # Local diagnostic logs
 npm-install-log.txt
 npm-build-log.txt
+
+# ruflo: keep full-harness runtime/worker state and any secrets out of git
+# (see docs/ruflo.md). The curated .claude/agents/ files ARE committed.
+.claude-flow/
+.mcp.json
+*.bak

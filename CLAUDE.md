@@ -55,14 +55,9 @@ cd /c/Users/chase/tof-app
 
 ## Tools on hand
 
-Reference tools to keep available for future tasks.
-
-- **ruflo** — agent meta-harness that adds multi-agent capabilities to Claude Code / Codex (specialized agents, self-learning memory, vector DB, background workers).
-  - Repo: `https://github.com/ruvnet/ruflo.git`
-  - CLI init: `npx ruflo@latest init wizard` (full setup: MCP server, hooks, agents)
-  - Lightweight: install individual commands via Claude Code `/plugin install`
-  - Web UI: `flo.ruv.io`
-  - Not installed in this repo yet — set up on request.
+See `docs/ruflo.md` for the **ruflo** agent meta-harness — what it is, the
+curated setup that keeps it out of this product repo, and the portable
+`.claude/agents/` set that travels to other league clones.
 
 ## Historical upstream notes
 
