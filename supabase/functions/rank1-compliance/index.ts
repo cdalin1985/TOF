@@ -39,7 +39,7 @@ serve(async (req) => {
       .eq('position', 1)
       .single();
 
-    if (!rank1) return json({ error: 'No #1 player found.' });
+    if (!rank1) return json({ error: 'No #1 player found.' }, 404);
 
     const playerName = rank1.players?.full_name ?? 'Rank #1 player';
 
@@ -131,6 +131,7 @@ serve(async (req) => {
           : 'The #1 player is still inside the 30-day obligation window.',
     });
   } catch (e) {
-    return json({ error: String(e) }, 500);
+    console.error('rank1-compliance failed', e);
+    return json({ error: 'Something went wrong. Please try again.' }, 500);
   }
 });
