@@ -14,6 +14,9 @@ source of truth, not your assumptions.
 
 ## Before reviewing
 
+- Read this repo's `CLAUDE.md` first. If it has no league canon (an unfilled
+  template / placeholder with no schema or `league_settings` specifics), stop
+  and tell the user to populate the league canon before relying on this review.
 - Read the existing migrations under `supabase/migrations/` to learn the
   established naming, RLS, and column conventions for THIS league.
 - Do not run destructive SQL. You may use read-only inspection only.

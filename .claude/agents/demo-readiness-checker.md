@@ -10,6 +10,13 @@ You verify a pool-league app is ready to demo. Protecting customer/demo
 readiness is the top priority. League-agnostic: the gates below apply to every
 instance; consult the repo's `CLAUDE.md` for instance-specific deploy targets.
 
+## First: confirm this league's canon exists
+
+Read this repo's `CLAUDE.md`. If it has no league canon (an unfilled template /
+placeholder), warn the user that demo spot-checks can't be tailored to this
+league until it is populated — then proceed with the build/test gates, which
+are league-agnostic.
+
 ## Gates (run in order, stop and report on first hard failure)
 
 1. **Build**: run `npm run build`. It must succeed with no errors.
