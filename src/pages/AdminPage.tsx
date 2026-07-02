@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ChevronLeft, AlertTriangle, Users, DollarSign, Settings, FileText,
-  Trophy, UserPlus, Swords, ArrowUp, ArrowDown, List,
+  ChevronLeft, ChevronRight, AlertTriangle, Users, DollarSign, Settings, FileText,
+  Trophy, UserPlus, Swords, ArrowUp, ArrowDown, List, BarChart3,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
@@ -41,6 +41,21 @@ export default function AdminPage() {
         <Badge variant="info">{profile?.role}</Badge>
       </div>
       <p className="text-[#9CA3AF] text-sm font-[Barlow] mb-6">League management — handle with care.</p>
+
+      {/* League stats dashboard link */}
+      <button
+        onClick={() => navigate('/admin/stats')}
+        className="w-full mb-4 glass-card glass-card-hover p-3.5 flex items-center gap-3 text-left"
+      >
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: 'rgba(198,40,40,0.18)' }}>
+          <BarChart3 size={18} className="text-[var(--toc-theme-accent)]" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[#E8E2D6] font-[Barlow] font-semibold text-sm">League Stats Dashboard</div>
+          <div className="text-[#6B7280] text-xs font-[Barlow]">Live overview — players, matches, venues, payments</div>
+        </div>
+        <ChevronRight size={16} className="text-[#6B7280] shrink-0" />
+      </button>
 
       {/* Tabs — horizontal scroll */}
       <div className="flex overflow-x-auto gap-1 mb-5 bg-[#1A1A1A] rounded-xl p-1" style={{ scrollbarWidth: 'none' }}>
