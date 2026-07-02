@@ -13,13 +13,14 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../lib/supabase';
+import { supabase, functionsUrl } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useRankings } from '../hooks/useRankings';
 import { PoolBall } from '../components/PoolBall';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
+import { QueryError } from '../components/QueryError';
 import { formatDateTime } from '../utils/time';
 import type { Match } from '../types/database';
 import {
@@ -208,20 +209,36 @@ export default function MatchPage() {
   const [lastScoreAction, setLastScoreAction]     = useState<LastScoreAction | null>(null);
   const [undoing, setUndoing]                     = useState(false);
 
-  const { data: match, isLoading } = useQuery<Match>({
+  const { data: match, isLoading, isError, refetch } = useQuery<Match>({
     queryKey: ['match', id],
     queryFn: async () => {
       // id may be either a match UUID (from MatchesPage) or a challenge UUID (from ChallengesPage)
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('matches')
         .select('*')
         .or(`id.eq.${id},challenge_id.eq.${id}`)
         .single();
-      return data!;
+      if (error) throw error;
+      return data;
     },
     enabled: !!id,
     refetchInterval: 5000,
   });
+
+  if (isError) {
+    return (
+      <div className="min-h-screen px-4 pt-4">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-[#9CA3AF] p-2 -ml-2 mb-4">
+          <ChevronLeft size={18} /> Back
+        </button>
+        <QueryError
+          title="Match Not Found"
+          message="This match couldn't be loaded. It may have been removed, or your connection dropped."
+          onRetry={() => refetch()}
+        />
+      </div>
+    );
+  }
 
   if (isLoading || !match) {
     return (
@@ -258,7 +275,7 @@ export default function MatchPage() {
   const callFn = async (path: string, body: object) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Session expired — please log in again.');
-    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${path}`, {
+    const res = await fetch(functionsUrl(path), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify(body),
@@ -271,11 +288,12 @@ export default function MatchPage() {
   };
 
   const sendScore = async (p1Score: number, p2Score: number) => {
-    await callFn('update-match-score', {
+    const json = await callFn('update-match-score', {
       match_id: match.id,
       my_score: isPlayer1 ? p1Score : p2Score,
       opponent_score: isPlayer1 ? p2Score : p1Score,
     });
+    if (json?.error) throw new Error(json.error);
     qc.invalidateQueries({ queryKey: ['match', id] });
   };
 
@@ -421,7 +439,8 @@ export default function MatchPage() {
                 setSubmitting(true);
                 setSubmitError('');
                 try {
-                  await callFn('update-match-score', { match_id: match.id, my_score: 0, opponent_score: 0 });
+                  const json = await callFn('update-match-score', { match_id: match.id, my_score: 0, opponent_score: 0 });
+                  if (json?.error) throw new Error(json.error);
                 } catch (e) {
                   setSubmitError(e instanceof Error ? e.message : 'Failed to start match.');
                 } finally {

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Clock, MapPin, Calendar } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase, functionsUrl } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useRankings } from '../hooks/useRankings';
 import { GlassCard } from '../components/GlassCard';
@@ -58,7 +58,7 @@ function RespondModal({
 
   const callFn = async (body: object) => {
     const { data: { session } } = await supabase.auth.getSession();
-    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/respond-to-challenge`, {
+    const res = await fetch(functionsUrl('respond-to-challenge'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
       body: JSON.stringify(body),
@@ -229,7 +229,7 @@ export default function ChallengesPage() {
 
   const callFn = async (body: object) => {
     const { data: { session } } = await supabase.auth.getSession();
-    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/respond-to-challenge`, {
+    await fetch(functionsUrl('respond-to-challenge'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
       body: JSON.stringify(body),

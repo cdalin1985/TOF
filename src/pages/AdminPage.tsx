@@ -5,7 +5,7 @@ import {
   Trophy, UserPlus, Swords, ArrowUp, ArrowDown, List,
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../lib/supabase';
+import { supabase, functionsUrl } from '../lib/supabase';
 import { useAuthStore } from '../stores/authStore';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
@@ -105,23 +105,35 @@ function DisputesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const [p2Score, setP2Score]     = useState('');
   const [notes, setNotes]         = useState('');
   const [loading, setLoading]     = useState(false);
+  const [resolveError, setResolveError] = useState('');
 
   const handleResolve = async (matchId: string) => {
     const s1 = parseInt(p1Score, 10);
     const s2 = parseInt(p2Score, 10);
     if (!winnerId || isNaN(s1) || isNaN(s2) || s1 < 0 || s2 < 0) return;
     setLoading(true);
+    setResolveError('');
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setLoading(false); return; }
-    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-dispute`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({ match_id: matchId, winner_id: winnerId, final_score_player1: s1, final_score_player2: s2, notes }),
-    });
-    setLoading(false);
-    setResolving(null);
-    qc.invalidateQueries({ queryKey: ['admin-disputes'] });
-    qc.invalidateQueries({ queryKey: ['rankings'] });
+    if (!session) { setLoading(false); setResolveError('Session expired — please log in again.'); return; }
+    try {
+      const res = await fetch(functionsUrl('resolve-dispute'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ match_id: matchId, winner_id: winnerId, final_score_player1: s1, final_score_player2: s2, notes }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json.error) {
+        setResolveError(json.error ?? 'Could not resolve this dispute.');
+        return;
+      }
+      setResolving(null);
+      qc.invalidateQueries({ queryKey: ['admin-disputes'] });
+      qc.invalidateQueries({ queryKey: ['rankings'] });
+    } catch {
+      setResolveError('Network error — please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (disputes.length === 0) {
@@ -168,8 +180,9 @@ function DisputesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
               </div>
               <textarea placeholder="Admin notes…" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
                 className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[var(--toc-theme-accent)] resize-none" />
+              {resolveError && <p className="text-[#EF4444] text-xs font-[Barlow]">{resolveError}</p>}
               <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={() => setResolving(null)}>Cancel</Button>
+                <Button variant="ghost" size="sm" onClick={() => { setResolving(null); setResolveError(''); }}>Cancel</Button>
                 <Button variant="primary" size="sm" loading={loading} disabled={!winnerId} onClick={() => handleResolve(m.id)}>Resolve</Button>
               </div>
             </div>
@@ -242,7 +255,7 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     setReverseError('');
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setLoading(false); setReverseError('Session expired — please log in again.'); return; }
-    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/respond-to-challenge`, {
+    const res = await fetch(functionsUrl('respond-to-challenge'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({ challenge_id: c.id, action: 'reverse_decline' }),
@@ -272,26 +285,37 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const handleForfeit = async (c: ChallengeRow) => {
     if (!winnerId || !c.match_id) return;
     setLoading(true);
+    setReverseError('');
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setLoading(false); resetAction(); return; }
+    if (!session) { setLoading(false); setReverseError('Session expired — please log in again.'); return; }
     const challengerWon = winnerId === c.challenger_id;
-    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-dispute`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({
-        match_id: c.match_id,
-        winner_id: winnerId,
-        final_score_player1: challengerWon ? c.race_length : 0,
-        final_score_player2: challengerWon ? 0 : c.race_length,
-        notes: 'Admin forfeit',
-        force_complete: true,
-      }),
-    });
-    await supabase.from('challenges').update({ status: 'forfeited' }).eq('id', c.id);
-    qc.invalidateQueries({ queryKey: ['admin-active-challenges'] });
-    qc.invalidateQueries({ queryKey: ['rankings'] });
-    setLoading(false);
-    resetAction();
+    try {
+      const res = await fetch(functionsUrl('resolve-dispute'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({
+          match_id: c.match_id,
+          winner_id: winnerId,
+          final_score_player1: challengerWon ? c.race_length : 0,
+          final_score_player2: challengerWon ? 0 : c.race_length,
+          notes: 'Admin forfeit',
+          force_complete: true,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json.error) {
+        setReverseError(json.error ?? 'Could not apply the forfeit.');
+        return;
+      }
+      await supabase.from('challenges').update({ status: 'forfeited' }).eq('id', c.id);
+      qc.invalidateQueries({ queryKey: ['admin-active-challenges'] });
+      qc.invalidateQueries({ queryKey: ['rankings'] });
+      resetAction();
+    } catch {
+      setReverseError('Network error — please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const STATUS_BADGE: Record<string, string> = {
@@ -364,6 +388,7 @@ function ChallengesTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
                       <p className="text-[#F59E0B] text-xs font-[Barlow]">No match started — this will cancel the challenge only.</p>
                     )
                   )}
+                  {reverseError && <p className="text-[#EF4444] text-xs font-[Barlow]">{reverseError}</p>}
                   <div className="flex gap-2">
                     <Button variant="ghost" size="sm" onClick={resetAction}>Back</Button>
                     <Button
@@ -437,21 +462,33 @@ function MatchesAdminTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
   const [p2Score, setP2Score]     = useState('');
   const [notes, setNotes]         = useState('');
   const [loading, setLoading]     = useState(false);
+  const [forceError, setForceError] = useState('');
 
   const handleForceComplete = async (matchId: string) => {
     if (!winnerId) return;
     setLoading(true);
+    setForceError('');
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setLoading(false); return; }
-    await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-dispute`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({ match_id: matchId, winner_id: winnerId, final_score_player1: parseInt(p1Score) || 0, final_score_player2: parseInt(p2Score) || 0, notes, force_complete: true }),
-    });
-    setLoading(false);
-    setResolving(null);
-    qc.invalidateQueries({ queryKey: ['admin-active-matches'] });
-    qc.invalidateQueries({ queryKey: ['rankings'] });
+    if (!session) { setLoading(false); setForceError('Session expired — please log in again.'); return; }
+    try {
+      const res = await fetch(functionsUrl('resolve-dispute'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ match_id: matchId, winner_id: winnerId, final_score_player1: parseInt(p1Score) || 0, final_score_player2: parseInt(p2Score) || 0, notes, force_complete: true }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json.error) {
+        setForceError(json.error ?? 'Could not force-complete this match.');
+        return;
+      }
+      setResolving(null);
+      qc.invalidateQueries({ queryKey: ['admin-active-matches'] });
+      qc.invalidateQueries({ queryKey: ['rankings'] });
+    } catch {
+      setForceError('Network error — please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const STATUS_BADGE: Record<string, string> = { scheduled: 'info', in_progress: 'loss', submitted: 'pending' };
@@ -504,8 +541,9 @@ function MatchesAdminTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
               </div>
               <textarea placeholder="Admin notes…" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
                 className="w-full px-3 py-2 rounded-lg bg-[#252525] border border-[#333] text-[#E8E2D6] text-xs font-[Barlow] focus:outline-none focus:border-[var(--toc-theme-accent)] resize-none" />
+              {forceError && <p className="text-[#EF4444] text-xs font-[Barlow]">{forceError}</p>}
               <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={() => setResolving(null)}>Cancel</Button>
+                <Button variant="ghost" size="sm" onClick={() => { setResolving(null); setForceError(''); }}>Cancel</Button>
                 <Button variant="primary" size="sm" loading={loading} disabled={!winnerId} onClick={() => handleForceComplete(m.id)}>
                   Force Complete
                 </Button>
@@ -703,7 +741,7 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     }
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/set-player-active`, {
+      const res = await fetch(functionsUrl('set-player-active'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ player_id: p.id, is_active: !p.is_active }),
@@ -756,7 +794,7 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
       payload.email = trimmedEmail;
     }
 
-    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/add-player`, {
+    const res = await fetch(functionsUrl('add-player'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify(payload),
@@ -789,7 +827,7 @@ function PlayersTab({ qc }: { qc: ReturnType<typeof useQueryClient> }) {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setInviteError('Session expired — please log in again.'); setInviteLoading(false); return; }
 
-    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/add-player`, {
+    const res = await fetch(functionsUrl('add-player'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({ player_id: player.id, email: trimmedEmail }),
@@ -933,7 +971,7 @@ function TreasuryTab() {
     setError('');
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setLoading(false); setError('Session expired — please log in again.'); return; }
-    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-treasury`, {
+    const res = await fetch(functionsUrl('manage-treasury'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({ entry_type: entryType, amount_cents: Math.round(parseFloat(amount) * 100), description: desc }),
@@ -1074,6 +1112,7 @@ function SettingsTab() {
   const [edits, setEdits] = useState<Partial<SettingsFormState>>({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   if (!settings) return <div className="text-center py-12 text-[#6B7280] font-[Barlow]">Loading settings…</div>;
 
@@ -1102,8 +1141,13 @@ function SettingsTab() {
     if (!isDirty || hasBlankField) return;
     if (!window.confirm('Save these league rule changes?')) return;
     setSaving(true);
-    await supabase.from('league_settings').update(form).eq('id', settings.id);
+    setSaveError('');
+    const { error } = await supabase.from('league_settings').update(form).eq('id', settings.id);
     setSaving(false);
+    if (error) {
+      setSaveError(error.message || 'Could not save settings.');
+      return;
+    }
     setEdits({});
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -1127,6 +1171,9 @@ function SettingsTab() {
       </GlassCard>
       {hasBlankField && (
         <p className="text-[#EF4444] text-xs font-[Barlow] px-1">Fill in every setting before saving.</p>
+      )}
+      {saveError && (
+        <p className="text-[#EF4444] text-xs font-[Barlow] px-1">{saveError}</p>
       )}
       <Button variant="primary" fullWidth loading={saving} disabled={!isDirty || hasBlankField} onClick={handleSave}>
         {saved ? '✓ Saved' : 'Save Settings'}

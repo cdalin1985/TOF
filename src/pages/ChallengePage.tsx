@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, CheckCircle, Swords, Minus, Plus } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { useRankings } from '../hooks/useRankings';
-import { supabase } from '../lib/supabase';
+import { supabase, functionsUrl } from '../lib/supabase';
 import { PoolBall } from '../components/PoolBall';
 import { GlassCard } from '../components/GlassCard';
 import { Button } from '../components/Button';
@@ -18,7 +18,7 @@ export default function ChallengePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { player } = useAuthStore();
-  const { data: rankings = [] } = useRankings();
+  const { data: rankings = [], isLoading: rankingsLoading } = useRankings();
 
   const target   = rankings.find((r) => r.player.id === id);
   const myRanking = rankings.find((r) => r.player.id === player?.id);
@@ -31,7 +31,26 @@ export default function ChallengePage() {
   const [sent, setSent]             = useState(false);
   const [error, setError]           = useState('');
 
-  if (!target) return null;
+  // Rankings still loading (or the player id is bad) — never render a blank page.
+  if (!target) {
+    return (
+      <div className="min-h-screen px-4 pt-4">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-[#9CA3AF] p-2 -ml-2 mb-4">
+          <ChevronLeft size={24} /> Back
+        </button>
+        {rankingsLoading ? (
+          <div className="space-y-4">
+            <div className="skeleton h-20 rounded-xl" />
+            <div className="skeleton h-40 rounded-xl" />
+          </div>
+        ) : (
+          <div className="text-center py-16 text-[#9CA3AF] font-[Barlow]">
+            Player not found. They may have been removed from the list.
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const bothInTop20 = !!myRanking && myRanking.ranking.position <= 20 && target.ranking.position <= 20;
 
@@ -59,7 +78,7 @@ export default function ChallengePage() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setError('Session expired — please log in again.'); setSending(false); return; }
     try {
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-challenge`, {
+      const res = await fetch(functionsUrl('create-challenge'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ challenged_player_id: id, discipline, race_length: race }),
