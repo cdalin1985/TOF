@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Swords, Trophy, TrendingUp, DollarSign, X } from 'lucide-react';
+import { Swords, Trophy, TrendingUp, DollarSign, BarChart3, X } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/authStore';
 import { useRankings } from '../hooks/useRankings';
@@ -367,6 +367,13 @@ export default function HomePage() {
               <span className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">Treasury</span>
             </div>
             <div className="text-[#6B7280] text-xs font-[Barlow]">League funds</div>
+          </GlassCard>
+          <GlassCard className="p-4 col-span-2" hover onClick={() => navigate('/stats')}>
+            <div className="flex items-center gap-2 mb-1">
+              <BarChart3 size={16} className="text-[#9CA3AF]" />
+              <span className="font-[Barlow] font-semibold text-[#E8E2D6] text-sm">League Stats</span>
+            </div>
+            <div className="text-[#6B7280] text-xs font-[Barlow]">Season totals, discipline &amp; venue breakdowns, leaders</div>
           </GlassCard>
         </div>
       </motion.div>
